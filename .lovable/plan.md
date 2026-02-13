@@ -1,133 +1,110 @@
 
 
-# Plan : Systeme de Modules Dynamique pour EasyFlow SaaS
+# Plan : Workflow operationnel E-commerce en 4 etapes avec gestion du personnel
 
-## Contexte
+## Constat
 
-Actuellement, toutes les pages du dashboard sont accessibles sans restriction. Pour un SaaS vendant des services, il faut un systeme qui :
-- Controle l'acces aux fonctionnalites selon les modules actives par le client
-- Connecte le choix des modules (onboarding) au dashboard
-- Prepare le terrain pour la facturation et les abonnements
+Le systeme actuel traite les commandes comme un simple suivi de statut. En realite, un e-commerce fonctionne avec un **pipeline operationnel en 4 etapes**, chacune impliquant des roles specifiques. Le pack gratuit doit inclure un minimum de personnel pour que le client puisse demarrer immediatement.
 
-## Approche en 3 phases
+## Le pipeline E-commerce
 
-### Phase 1 : Registre de modules et acces conditionnel (Frontend)
+```text
+Reception          Confirmation         Preparation          Livraison
+(auto/manuelle) -> (Caller) ----------> (Preparateur) -----> (Livreur)
+                   Appelle le client     Prepare le colis     Livre au client
+                   Confirme adresse      Verifie le stock     Met a jour statut
+                   Valide paiement       Emballe              Collecte paiement
+```
 
-**1.1 - Creer un registre central des modules**
+## Ce qui change
 
-Fichier `src/lib/modules-registry.ts` qui definit tous les modules avec :
-- ID, nom, description, icone
-- Niveau de prix (gratuit, niveau1, niveau2, niveau3)
-- Routes associees (ex: `stock_auto` donne acces a `/dashboard/products` avec fonctions avancees)
-- Fonctionnalites incluses dans chaque module
+### 1. Nouveau modele de donnees : Roles et personnel
 
-**1.2 - Creer un contexte React pour les modules actifs**
+Ajouter un systeme de **roles operationnels** et de **gestion d'equipe** au registre de modules :
 
-Fichier `src/contexts/ModulesContext.tsx` :
-- Stocke la liste des modules actives pour l'utilisateur courant
-- Fournit des fonctions utilitaires : `hasModule(id)`, `getActiveModules()`, `isFeatureEnabled(feature)`
-- Pour l'instant, les donnees viennent du localStorage (simule), puis migreront vers la base de donnees
+- **Roles definis** : `admin`, `caller`, `preparateur`, `livreur`
+- **Pack gratuit inclut** : 1 admin + 1 caller + 1 preparateur + 1 livreur (equipe minimale pour demarrer)
+- **Modules payants** : personnel supplementaire par role
 
-**1.3 - Adapter la sidebar dynamiquement**
+### 2. Restructuration du registre de modules (`modules-registry.ts`)
 
-Modifier `DashboardSidebar.tsx` pour :
-- Afficher uniquement les items de menu correspondant aux modules actifs
-- Afficher les items verrouilles (icone cadenas) pour les modules non actives avec un lien "Activer ce module"
+**Modules gratuits revus :**
 
-**1.4 - Creer un composant ModuleGate**
+| Module | Avant | Apres |
+|--------|-------|-------|
+| `orders_basic` | Liste + creation simple | Reception auto/manuelle + pipeline 4 etapes + statuts lies aux roles |
+| `team_basic` | *n'existait pas* | **Nouveau** - Equipe de base (1 admin, 1 caller, 1 preparateur, 1 livreur) |
+| `delivery_basic` | Suivi statut simple | Suivi lie au livreur assigne + preuve de livraison basique |
 
-Composant `src/components/modules/ModuleGate.tsx` qui enveloppe les fonctionnalites payantes :
-- Si le module est actif : affiche le contenu normalement
-- Si le module n'est pas actif : affiche un ecran d'upsell avec description du module et bouton "Activer"
+**Nouveaux modules payants :**
 
-### Phase 2 : Page de gestion des modules (dans le dashboard)
+| Module | Tier | Prix | Description |
+|--------|------|------|-------------|
+| `extra_callers` | tier1 | 2 000 FCFA | +3 callers supplementaires |
+| `extra_preparers` | tier1 | 2 000 FCFA | +3 preparateurs supplementaires |
+| `extra_drivers` | tier1 | 3 000 FCFA | +3 livreurs supplementaires |
+| `call_center` | tier2 | 7 000 FCFA | Callers illimites + scripts d'appel + stats performance |
+| `warehouse_team` | tier2 | 7 000 FCFA | Preparateurs illimites + gestion des postes + productivite |
 
-**2.1 - Page "Mes Modules" (`/dashboard/modules`)**
+### 3. Statuts de commande lies au pipeline
 
-Interface permettant au client de :
-- Voir tous les modules disponibles organises par niveau de prix
-- Voir lesquels sont actifs dans son abonnement
-- Activer/desactiver des modules (avec impact sur le prix affiche)
-- Voir un recapitulatif du cout mensuel en FCFA
+Remplacer les statuts actuels par un workflow operationnel :
 
-**2.2 - Connecter l'onboarding au systeme de modules**
+```text
+new -> caller_pending -> confirmed -> preparing -> ready -> in_transit -> delivered
+                      -> cancelled (a tout moment)
+                      -> returned (apres livraison)
+```
 
-Modifier le flux pour que les modules choisis pendant l'onboarding soient sauvegardes dans le contexte et utilises par le dashboard.
+Chaque statut est associe a un role qui le traite :
+- `new` / `caller_pending` / `confirmed` : Caller
+- `preparing` / `ready` : Preparateur
+- `in_transit` / `delivered` / `returned` : Livreur
 
-### Phase 3 : Fonctionnalites conditionnelles dans les pages existantes
+### 4. Nouvelle page Equipe (`/dashboard/team`)
 
-**3.1 - Page Produits**
+Page de gestion du personnel incluse dans le pack gratuit :
+- Liste des membres avec leur role (caller, preparateur, livreur)
+- Indicateur du quota (ex: "1/1 callers utilises")
+- Performance basique (commandes traitees par personne)
+- Bouton "Ajouter" qui redirige vers le module payant si quota atteint
 
-- Base gratuite : liste simple des produits
-- Module `stock_auto` : ajoute la gestion automatique du stock, alertes, FIFO
-- Module `custom_fields` : ajoute des champs personnalises sur les fiches produits
+### 5. Refonte de la page Commandes
 
-**3.2 - Page Clients**
+La page Commandes devient un **tableau de bord operationnel** avec :
+- **Vue Kanban** par etape du pipeline (colonnes : Nouvelles > Caller > Preparation > Pret > En livraison > Livre)
+- **Filtrage par role** : un caller ne voit que ses commandes a confirmer, un preparateur ses commandes a preparer
+- **Actions contextuelles** : chaque etape a ses propres boutons (ex: "Confirmer la commande" pour le caller, "Marquer comme pret" pour le preparateur)
 
-- Base gratuite : liste et coordonnees
-- Module `customer_history` : historique complet des achats
-- Module `segmentation` : segmentation avancee et filtres
-- Module `loyalty` : onglet programme fidelite
+### 6. Sidebar mise a jour
 
-**3.3 - Page Commandes**
-
-- Base gratuite : creation et suivi simple
-- Module `custom_status` : statuts personnalisables
-- Module `export` : boutons export Excel/PDF
-
-**3.4 - Page Livraisons**
-
-- Base gratuite : suivi basique
-- Module `multi_delivery` : multi-livreurs et affectation
-- Module `geo_tracking` : carte et geolocalisation temps reel
+Ajouter l'entree "Equipe" dans la section Principal de la sidebar, accessible gratuitement.
 
 ## Details techniques
 
-### Structure des fichiers a creer/modifier
+### Fichiers a creer
 
-```text
-src/
-  lib/
-    modules-registry.ts      (nouveau - definition de tous les modules)
-  contexts/
-    ModulesContext.tsx         (nouveau - contexte React pour modules actifs)
-  components/
-    modules/
-      ModuleGate.tsx           (nouveau - controle d'acces aux fonctionnalites)
-      ModuleCard.tsx           (nouveau - carte module pour la page gestion)
-      UpgradePrompt.tsx        (nouveau - ecran d'upsell quand module inactif)
-  pages/
-    ModulesManagement.tsx      (nouveau - page /dashboard/modules)
-```
+- `src/lib/team-roles.ts` : Definition des roles, quotas par module, et types TypeScript
+- `src/pages/Team.tsx` : Page de gestion de l'equipe avec mock data
+- `src/components/orders/OrderPipeline.tsx` : Vue Kanban du pipeline de commandes
 
 ### Fichiers a modifier
 
-- `src/App.tsx` : ajouter route `/dashboard/modules`, wrapper avec ModulesProvider
-- `src/components/dashboard/DashboardSidebar.tsx` : sidebar dynamique selon modules
-- `src/pages/Orders.tsx` : envelopper fonctionnalites avancees avec ModuleGate
-- `src/pages/Products.tsx` : idem
-- `src/pages/Customers.tsx` : idem
-- `src/pages/Deliveries.tsx` : idem
-- `src/pages/Onboarding.tsx` : sauvegarder modules choisis dans le contexte
+- `src/lib/modules-registry.ts` : Ajouter module `team_basic` (gratuit), `extra_callers`, `extra_preparers`, `extra_drivers`, `call_center`, `warehouse_team`
+- `src/pages/Orders.tsx` : Refonte avec pipeline 4 etapes et statuts operationnels
+- `src/pages/Deliveries.tsx` : Lier les livraisons aux livreurs de l'equipe
+- `src/components/dashboard/DashboardSidebar.tsx` : Ajouter entree "Equipe"
+- `src/App.tsx` : Ajouter route `/dashboard/team`
 
-### Exemple d'utilisation de ModuleGate
+### Structure des quotas par defaut
 
 ```text
-// Dans Products.tsx
-<ModuleGate moduleId="stock_auto" fallback={<UpgradePrompt module="stock_auto" />}>
-  <StockAutomationPanel />
-</ModuleGate>
+Pack gratuit :  1 admin, 1 caller, 1 preparateur, 1 livreur
++extra_callers : +3 callers (total 4)
++extra_preparers : +3 preparateurs (total 4)
++extra_drivers : +3 livreurs (total 4)
++call_center : callers illimites
++warehouse_team : preparateurs illimites
++multi_delivery (existant) : livreurs illimites
 ```
-
-### Stockage temporaire (avant backend)
-
-Les modules actifs seront stockes dans localStorage sous la cle `easyflow_active_modules`. Le ModulesContext lira cette valeur au demarrage et la mettra a jour lors des changements. Cette approche permet de tester tout le systeme sans backend, puis de migrer facilement vers Supabase plus tard.
-
-## Resultat attendu
-
-Apres cette implementation :
-- Le dashboard s'adapte dynamiquement aux modules choisis par le client
-- Les fonctionnalites payantes sont clairement identifiees et verrouillees
-- Le client peut gerer ses modules depuis le dashboard
-- Le systeme est pret pour l'ajout du backend (auth + paiement) a l'etape suivante
 
