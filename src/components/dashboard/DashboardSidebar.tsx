@@ -9,8 +9,11 @@ import {
   Settings,
   HelpCircle,
   Zap,
+  Lock,
+  Boxes,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useModules } from "@/contexts/ModulesContext";
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +26,15 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
-const mainItems = [
+interface SidebarItem {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  /** Module ID required to unlock this item. undefined = always visible */
+  requiredModule?: string;
+}
+
+const mainItems: SidebarItem[] = [
   { title: "Tableau de bord", url: "/dashboard", icon: LayoutDashboard },
   { title: "Commandes", url: "/dashboard/orders", icon: ShoppingCart },
   { title: "Clients", url: "/dashboard/customers", icon: Users },
@@ -31,15 +42,50 @@ const mainItems = [
   { title: "Livraisons", url: "/dashboard/deliveries", icon: Truck },
 ];
 
-const toolItems = [
+const toolItems: SidebarItem[] = [
   { title: "Statistiques", url: "/dashboard/stats", icon: BarChart3 },
-  { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare },
+  { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns" },
 ];
 
-const bottomItems = [
+const bottomItems: SidebarItem[] = [
+  { title: "Modules", url: "/dashboard/modules", icon: Boxes },
   { title: "Paramètres", url: "/dashboard/settings", icon: Settings },
   { title: "Aide", url: "/dashboard/help", icon: HelpCircle },
 ];
+
+function SidebarNavItem({ item }: { item: SidebarItem }) {
+  const { hasModule } = useModules();
+  const locked = item.requiredModule ? !hasModule(item.requiredModule) : false;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild>
+        {locked ? (
+          <NavLink
+            to="/dashboard/modules"
+            end={false}
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground/60 hover:bg-sidebar-accent transition-colors"
+            activeClassName=""
+          >
+            <item.icon size={18} />
+            <span>{item.title}</span>
+            <Lock size={14} className="ml-auto text-muted-foreground/40" />
+          </NavLink>
+        ) : (
+          <NavLink
+            to={item.url}
+            end
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+            activeClassName="bg-sidebar-accent text-primary font-medium"
+          >
+            <item.icon size={18} />
+            <span>{item.title}</span>
+          </NavLink>
+        )}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
 export function DashboardSidebar() {
   return (
@@ -59,19 +105,7 @@ export function DashboardSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end
-                      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                      activeClassName="bg-sidebar-accent text-primary font-medium"
-                    >
-                      <item.icon size={18} />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem key={item.title} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -82,19 +116,7 @@ export function DashboardSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {toolItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end
-                      className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                      activeClassName="bg-sidebar-accent text-primary font-medium"
-                    >
-                      <item.icon size={18} />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem key={item.title} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -104,19 +126,7 @@ export function DashboardSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           {bottomItems.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <NavLink
-                  to={item.url}
-                  end
-                  className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                  activeClassName="bg-sidebar-accent text-primary font-medium"
-                >
-                  <item.icon size={18} />
-                  <span>{item.title}</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <SidebarNavItem key={item.title} item={item} />
           ))}
         </SidebarMenu>
       </SidebarFooter>
