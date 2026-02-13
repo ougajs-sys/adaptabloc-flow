@@ -2,12 +2,21 @@ import { OnboardingData } from "@/pages/Onboarding";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useModules } from "@/contexts/ModulesContext";
+import { useEffect } from "react";
 
 interface Props {
   data: OnboardingData;
 }
 
 export const OnboardingStepLaunch = ({ data }: Props) => {
+  const { setModules } = useModules();
+
+  // Save selected modules to context (and localStorage) when this step mounts
+  useEffect(() => {
+    setModules(data.modules);
+  }, [data.modules, setModules]);
+
   const sectorLabels: Record<string, string> = {
     ecommerce: "E-commerce & Retail",
     transport: "Transport & Logistique",
