@@ -11,6 +11,7 @@ import {
   Zap,
   Lock,
   Boxes,
+  UsersRound,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useModules } from "@/contexts/ModulesContext";
@@ -40,6 +41,7 @@ const mainItems: SidebarItem[] = [
   { title: "Clients", url: "/dashboard/customers", icon: Users },
   { title: "Produits", url: "/dashboard/products", icon: Package },
   { title: "Livraisons", url: "/dashboard/deliveries", icon: Truck },
+  { title: "Équipe", url: "/dashboard/team", icon: UsersRound },
 ];
 
 const toolItems: SidebarItem[] = [
