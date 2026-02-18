@@ -9,6 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus, Package, AlertTriangle } from "lucide-react";
+import { NewProductDialog, type NewProductFormValues } from "@/components/products/NewProductDialog";
 
 interface Product {
   id: string;
@@ -86,26 +87,52 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   out_of_stock: { label: "Rupture", variant: "destructive" },
 };
 
+let productCounter = mockProducts.length + 1;
+
 const Products = () => {
+  const [products, setProducts] = useState(mockProducts);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [newProductOpen, setNewProductOpen] = useState(false);
 
-  const categories = [...new Set(mockProducts.map((p) => p.category))];
+  const handleNewProduct = (values: NewProductFormValues) => {
+    const id = `PRD-${String(productCounter++).padStart(3, "0")}`;
+    const totalStock = values.variants.reduce((s, v) => s + (v.stock ?? 0), 0);
+    setProducts((prev) => [
+      {
+        id,
+        name: values.name,
+        category: values.category,
+        price: values.price,
+        stock: totalStock,
+        maxStock: values.maxStock,
+        variants: values.variants.map((v) => ({ label: v.label ?? "", stock: v.stock ?? 0 })),
+        image: values.image,
+        status: values.status as "active" | "draft" | "out_of_stock",
+        sales: 0,
+      },
+      ...prev,
+    ]);
+  };
 
-  const filtered = mockProducts.filter((p) => {
+  const categories = [...new Set(products.map((p) => p.category))];
+
+  const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
     const matchCategory = categoryFilter === "all" || p.category === categoryFilter;
     return matchSearch && matchCategory;
   });
 
-  const lowStock = mockProducts.filter((p) => p.stock > 0 && p.stock <= p.maxStock * 0.15).length;
-  const outOfStock = mockProducts.filter((p) => p.stock === 0).length;
+  const lowStock = products.filter((p) => p.stock > 0 && p.stock <= p.maxStock * 0.15).length;
+  const outOfStock = products.filter((p) => p.stock === 0).length;
 
   return (
+    <>
+    <NewProductDialog open={newProductOpen} onOpenChange={setNewProductOpen} onSubmit={handleNewProduct} />
     <DashboardLayout
       title="Produits"
       actions={
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2" onClick={() => setNewProductOpen(true)}>
           <Plus size={16} /> Ajouter un produit
         </Button>
       }
@@ -202,6 +229,7 @@ const Products = () => {
         })}
       </div>
     </DashboardLayout>
+    </>
   );
 };
 

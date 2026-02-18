@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Plus, UserPlus, Star, Users, TrendingUp } from "lucide-react";
+import { NewCustomerDialog, type NewCustomerFormValues } from "@/components/customers/NewCustomerDialog";
 
 interface Customer {
   id: string;
@@ -46,24 +47,50 @@ const segmentConfig: Record<string, { label: string; variant: "default" | "secon
   inactive: { label: "Inactif", variant: "destructive" },
 };
 
+let customerCounter = mockCustomers.length + 1;
+
 const Customers = () => {
+  const [customers, setCustomers] = useState(mockCustomers);
   const [search, setSearch] = useState("");
   const [segmentFilter, setSegmentFilter] = useState("all");
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
-  const filtered = mockCustomers.filter((c) => {
+  const handleNewCustomer = (values: NewCustomerFormValues) => {
+    const id = `CLI-${String(customerCounter++).padStart(3, "0")}`;
+    setCustomers((prev) => [
+      {
+        id,
+        name: values.name,
+        phone: values.phone,
+        email: values.email || "",
+        segment: values.segment,
+        totalOrders: 0,
+        totalSpent: 0,
+        lastOrder: new Date().toISOString().split("T")[0],
+        loyaltyPoints: 0,
+        joinDate: new Date().toISOString().split("T")[0],
+      },
+      ...prev,
+    ]);
+  };
+
+  const filtered = customers.filter((c) => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
     const matchSegment = segmentFilter === "all" || c.segment === segmentFilter;
     return matchSearch && matchSegment;
   });
 
-  const totalRevenue = mockCustomers.reduce((s, c) => s + c.totalSpent, 0);
-  const avgOrderValue = Math.round(totalRevenue / mockCustomers.reduce((s, c) => s + c.totalOrders, 0));
+  const totalRevenue = customers.reduce((s, c) => s + c.totalSpent, 0);
+  const totalOrders = customers.reduce((s, c) => s + c.totalOrders, 0);
+  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
   return (
+    <>
+    <NewCustomerDialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen} onSubmit={handleNewCustomer} />
     <DashboardLayout
       title="Clients"
       actions={
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}>
           <UserPlus size={16} /> Ajouter un client
         </Button>
       }
@@ -160,6 +187,7 @@ const Customers = () => {
         </CardContent>
       </Card>
     </DashboardLayout>
+    </>
   );
 };
 

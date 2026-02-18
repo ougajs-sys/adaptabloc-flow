@@ -13,10 +13,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Eye, Package, MapPin, Phone, LayoutGrid, List } from "lucide-react";
 import { OrderPipeline, type PipelineOrder } from "@/components/orders/OrderPipeline";
 import { getStageByStatus, pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
+import { NewOrderDialog, type NewOrderFormValues } from "@/components/orders/NewOrderDialog";
 
 interface Order {
   id: string;
@@ -108,12 +108,37 @@ const paymentConfig: Record<string, { label: string; variant: "default" | "secon
   refunded: { label: "Remboursé", variant: "destructive" },
 };
 
+let orderCounter = initialOrders.length + 1;
+
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+
+  const handleNewOrder = (values: NewOrderFormValues) => {
+    const id = `CMD-${1240 + orderCounter++}`;
+    const newOrder: Order = {
+      id,
+      customer: values.customer,
+      phone: values.phone,
+      email: values.email,
+      items: values.items.map((i) => ({
+        name: i.name,
+        qty: i.qty,
+        price: i.price,
+        variant: i.variant || undefined,
+      })),
+      total: values.items.reduce((s, i) => s + i.qty * i.price, 0),
+      status: "new",
+      paymentStatus: values.paymentStatus,
+      date: new Date().toISOString(),
+      address: values.address,
+    };
+    setOrders((prev) => [newOrder, ...prev]);
+  };
 
   const filtered = orders.filter((o) => {
     const matchSearch =
@@ -154,6 +179,12 @@ const Orders = () => {
   const cancelled = orders.filter((o) => o.status === "cancelled").length;
 
   return (
+    <>
+    <NewOrderDialog
+      open={newOrderOpen}
+      onOpenChange={setNewOrderOpen}
+      onSubmit={handleNewOrder}
+    />
     <DashboardLayout
       title="Commandes"
       actions={
@@ -176,7 +207,7 @@ const Orders = () => {
               <List size={14} />
             </Button>
           </div>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={() => setNewOrderOpen(true)}>
             <Plus size={16} /> Nouvelle commande
           </Button>
         </div>
@@ -352,6 +383,7 @@ const Orders = () => {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
+    </>
   );
 };
 
