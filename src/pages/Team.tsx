@@ -18,20 +18,44 @@ import {
   type TeamMember,
 } from "@/lib/team-roles";
 import { useNavigate } from "react-router-dom";
+import { NewMemberDialog, type NewMemberFormValues } from "@/components/team/NewMemberDialog";
+
+let memberCounter = mockTeamMembers.length + 1;
 
 const Team = () => {
   const { activeModules } = useModules();
   const navigate = useNavigate();
   const quotas = computeQuotas(activeModules);
-  const [members] = useState<TeamMember[]>(mockTeamMembers);
+  const [members, setMembers] = useState<TeamMember[]>(mockTeamMembers);
+  const [newMemberOpen, setNewMemberOpen] = useState(false);
 
   const countByRole = (role: TeamRole) => members.filter((m) => m.role === role).length;
 
+  const handleNewMember = (values: NewMemberFormValues) => {
+    const newMember: TeamMember = {
+      id: `tm-${memberCounter++}`,
+      name: values.name,
+      phone: values.phone,
+      role: values.role,
+      ordersHandled: 0,
+      status: "active",
+    };
+    setMembers((prev) => [...prev, newMember]);
+  };
+
   return (
+    <>
+    <NewMemberDialog
+      open={newMemberOpen}
+      onOpenChange={setNewMemberOpen}
+      onSubmit={handleNewMember}
+      existingMembers={members}
+      activeModules={activeModules}
+    />
     <DashboardLayout
       title="Équipe"
       actions={
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2" onClick={() => setNewMemberOpen(true)}>
           <UserPlus size={16} /> Ajouter un membre
         </Button>
       }
@@ -137,6 +161,7 @@ const Team = () => {
         </CardContent>
       </Card>
     </DashboardLayout>
+    </>
   );
 };
 
