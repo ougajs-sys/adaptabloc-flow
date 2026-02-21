@@ -10,9 +10,16 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, Plus, UserPlus, Star, Users, TrendingUp } from "lucide-react";
 import { NewCustomerDialog, type NewCustomerFormValues } from "@/components/customers/NewCustomerDialog";
+import { EditCustomerDialog, type EditCustomerFormValues } from "@/components/customers/EditCustomerDialog";
+import { CustomerDetailDialog } from "@/components/customers/CustomerDetailDialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Customer {
   id: string;
@@ -54,24 +61,33 @@ const Customers = () => {
   const [search, setSearch] = useState("");
   const [segmentFilter, setSegmentFilter] = useState("all");
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
   const handleNewCustomer = (values: NewCustomerFormValues) => {
     const id = `CLI-${String(customerCounter++).padStart(3, "0")}`;
-    setCustomers((prev) => [
-      {
-        id,
-        name: values.name,
-        phone: values.phone,
-        email: values.email || "",
-        segment: values.segment,
-        totalOrders: 0,
-        totalSpent: 0,
-        lastOrder: new Date().toISOString().split("T")[0],
-        loyaltyPoints: 0,
-        joinDate: new Date().toISOString().split("T")[0],
-      },
-      ...prev,
-    ]);
+    setCustomers((prev) => [{
+      id, name: values.name, phone: values.phone, email: values.email || "",
+      segment: values.segment, totalOrders: 0, totalSpent: 0,
+      lastOrder: new Date().toISOString().split("T")[0], loyaltyPoints: 0,
+      joinDate: new Date().toISOString().split("T")[0],
+    }, ...prev]);
+  };
+
+  const handleEditCustomer = (values: EditCustomerFormValues) => {
+    if (!editingCustomer) return;
+    setCustomers((prev) => prev.map((c) => c.id === editingCustomer.id ? {
+      ...c, name: values.name, phone: values.phone, email: values.email, segment: values.segment,
+    } : c));
+    toast({ title: "Client modifié" });
+  };
+
+  const handleDeleteCustomer = () => {
+    if (!deletingCustomer) return;
+    setCustomers((prev) => prev.filter((c) => c.id !== deletingCustomer.id));
+    setDeletingCustomer(null);
+    toast({ title: "Client supprimé" });
   };
 
   const filtered = customers.filter((c) => {
@@ -87,21 +103,43 @@ const Customers = () => {
   return (
     <>
     <NewCustomerDialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen} onSubmit={handleNewCustomer} />
+    <CustomerDetailDialog
+      customer={selectedCustomer}
+      open={!!selectedCustomer}
+      onOpenChange={(v) => { if (!v) setSelectedCustomer(null); }}
+      onEdit={(c) => setEditingCustomer(c)}
+      onDelete={(c) => setDeletingCustomer(c)}
+    />
+    {editingCustomer && (
+      <EditCustomerDialog
+        open={!!editingCustomer}
+        onOpenChange={(v) => { if (!v) setEditingCustomer(null); }}
+        onSubmit={handleEditCustomer}
+        defaultValues={{ name: editingCustomer.name, phone: editingCustomer.phone, email: editingCustomer.email, segment: editingCustomer.segment as "new" | "regular" | "vip" | "inactive" }}
+      />
+    )}
+    <AlertDialog open={!!deletingCustomer} onOpenChange={(v) => { if (!v) setDeletingCustomer(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer {deletingCustomer?.name} ?</AlertDialogTitle>
+          <AlertDialogDescription>Ce client sera définitivement supprimé.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteCustomer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <DashboardLayout
       title="Clients"
-      actions={
-        <Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}>
-          <UserPlus size={16} /> Ajouter un client
-        </Button>
-      }
+      actions={<Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}><UserPlus size={16} /> Ajouter un client</Button>}
     >
-      {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Clients total", value: mockCustomers.length, icon: Users },
-          { label: "Clients VIP", value: mockCustomers.filter(c => c.segment === "vip").length, icon: Star },
+          { label: "Clients total", value: customers.length, icon: Users },
+          { label: "Clients VIP", value: customers.filter((c) => c.segment === "vip").length, icon: Star },
           { label: "Panier moyen", value: `${avgOrderValue.toLocaleString("fr-FR")} F`, icon: TrendingUp },
-          { label: "Nouveaux (ce mois)", value: mockCustomers.filter(c => c.segment === "new").length, icon: UserPlus },
+          { label: "Nouveaux (ce mois)", value: customers.filter((c) => c.segment === "new").length, icon: UserPlus },
         ].map((s) => (
           <Card key={s.label} className="border-border/60">
             <CardContent className="p-4">
@@ -114,17 +152,13 @@ const Customers = () => {
           </Card>
         ))}
       </div>
-
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Rechercher par nom ou téléphone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Segment" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Segment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous</SelectItem>
             <SelectItem value="vip">VIP</SelectItem>
@@ -134,8 +168,6 @@ const Customers = () => {
           </SelectContent>
         </Select>
       </div>
-
-      {/* Table */}
       <Card className="border-border/60">
         <CardContent className="p-0">
           <Table>
@@ -152,33 +184,23 @@ const Customers = () => {
             <TableBody>
               {filtered.map((customer) => {
                 const seg = segmentConfig[customer.segment];
-                const initials = customer.name.split(" ").map(n => n[0]).join("");
+                const initials = customer.name.split(" ").map((n) => n[0]).join("");
                 return (
-                  <TableRow key={customer.id} className="cursor-pointer">
+                  <TableRow key={customer.id} className="cursor-pointer" onClick={() => setSelectedCustomer(customer)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
+                        <Avatar className="h-8 w-8"><AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback></Avatar>
                         <div>
                           <p className="font-medium text-sm">{customer.name}</p>
                           <p className="text-xs text-muted-foreground">{customer.email}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={seg.variant} className="text-xs">{seg.label}</Badge>
-                    </TableCell>
+                    <TableCell><Badge variant={seg.variant} className="text-xs">{seg.label}</Badge></TableCell>
                     <TableCell className="font-medium">{customer.totalOrders}</TableCell>
                     <TableCell className="font-medium">{customer.totalSpent.toLocaleString("fr-FR")} F</TableCell>
-                    <TableCell>
-                      <span className="text-xs text-accent font-medium">{customer.loyaltyPoints} pts</span>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(customer.lastOrder).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                    </TableCell>
+                    <TableCell><span className="text-xs text-accent font-medium">{customer.loyaltyPoints} pts</span></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{new Date(customer.lastOrder).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
                   </TableRow>
                 );
               })}

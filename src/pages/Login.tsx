@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Mail, ChevronDown, ChevronUp } from "lucide-react";
 import { motion } from "framer-motion";
+import { getUser } from "@/lib/auth-store";
 
 const FacebookIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -33,7 +34,12 @@ const Login = () => {
     setLoadingProvider(provider);
     try {
       await login(provider, email, password);
-      navigate("/onboarding");
+      const user = getUser();
+      if (user?.has_completed_onboarding) {
+        navigate("/dashboard");
+      } else {
+        navigate("/onboarding");
+      }
     } finally {
       setLoadingProvider(null);
     }
