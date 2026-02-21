@@ -1,110 +1,93 @@
 
 
-# Plan : Workflow operationnel E-commerce en 4 etapes avec gestion du personnel
+# Page Statistiques -- Simple, visuelle, comprehensible par tous
 
-## Constat
+## Philosophie
+La page sera concue pour etre comprise par n'importe qui, meme sans aucune connaissance en statistiques. Chaque chiffre sera accompagne d'une **explication en langage courant**, d'**icones expressives** et de **couleurs intuitives** (vert = bien, rouge = attention, bleu = info). Pas de jargon technique.
 
-Le systeme actuel traite les commandes comme un simple suivi de statut. En realite, un e-commerce fonctionne avec un **pipeline operationnel en 4 etapes**, chacune impliquant des roles specifiques. Le pack gratuit doit inclure un minimum de personnel pour que le client puisse demarrer immediatement.
+## Structure de la page
 
-## Le pipeline E-commerce
+### En-tete
+- Titre : "Statistiques" via `DashboardLayout`
+- Un selecteur de periode simple : "Cette semaine" / "Ce mois" / "Tout" (Select)
 
-```text
-Reception          Confirmation         Preparation          Livraison
-(auto/manuelle) -> (Caller) ----------> (Preparateur) -----> (Livreur)
-                   Appelle le client     Prepare le colis     Livre au client
-                   Confirme adresse      Verifie le stock     Met a jour statut
-                   Valide paiement       Emballe              Collecte paiement
-```
+---
 
-## Ce qui change
+### Section 1 -- 4 cartes KPI avec explications humaines
 
-### 1. Nouveau modele de donnees : Roles et personnel
+Chaque carte affiche : une grosse valeur, une icone, et une **phrase explicative** en dessous.
 
-Ajouter un systeme de **roles operationnels** et de **gestion d'equipe** au registre de modules :
+| Carte | Valeur | Phrase explicative |
+|-------|--------|--------------------|
+| Taux de confirmation | 75% | "Sur 10 commandes recues, 7 à 8 ont ete confirmees par les callers" |
+| Temps moyen de preparation | ~2h | "En moyenne, un colis est pret 2 heures apres la confirmation" |
+| Taux de livraison reussie | 85% | "Sur 10 colis envoyes, 8 à 9 arrivent chez le client" |
+| Panier moyen | 45 000 F | "En moyenne, chaque client depense 45 000 F par commande" |
 
-- **Roles definis** : `admin`, `caller`, `preparateur`, `livreur`
-- **Pack gratuit inclut** : 1 admin + 1 caller + 1 preparateur + 1 livreur (equipe minimale pour demarrer)
-- **Modules payants** : personnel supplementaire par role
+Reutilise le composant `KpiCard` existant, enrichi d'un sous-texte explicatif.
 
-### 2. Restructuration du registre de modules (`modules-registry.ts`)
+---
 
-**Modules gratuits revus :**
+### Section 2 -- "Ou en sont vos commandes ?" (Funnel visuel)
 
-| Module | Avant | Apres |
-|--------|-------|-------|
-| `orders_basic` | Liste + creation simple | Reception auto/manuelle + pipeline 4 etapes + statuts lies aux roles |
-| `team_basic` | *n'existait pas* | **Nouveau** - Equipe de base (1 admin, 1 caller, 1 preparateur, 1 livreur) |
-| `delivery_basic` | Suivi statut simple | Suivi lie au livreur assigne + preuve de livraison basique |
+**BarChart horizontal** montrant le nombre de commandes a chaque etape du pipeline.
 
-**Nouveaux modules payants :**
+- Chaque barre porte le label de l'etape ("Nouvelles", "En confirmation", "En preparation"...)
+- Les couleurs suivent celles de `pipelineStages` (bleu caller, ambre preparateur, vert livreur)
+- Titre de section : "Ou en sont vos commandes ?"
+- Sous-titre : "Ce graphique montre combien de commandes se trouvent a chaque etape"
 
-| Module | Tier | Prix | Description |
-|--------|------|------|-------------|
-| `extra_callers` | tier1 | 2 000 FCFA | +3 callers supplementaires |
-| `extra_preparers` | tier1 | 2 000 FCFA | +3 preparateurs supplementaires |
-| `extra_drivers` | tier1 | 3 000 FCFA | +3 livreurs supplementaires |
-| `call_center` | tier2 | 7 000 FCFA | Callers illimites + scripts d'appel + stats performance |
-| `warehouse_team` | tier2 | 7 000 FCFA | Preparateurs illimites + gestion des postes + productivite |
+---
 
-### 3. Statuts de commande lies au pipeline
+### Section 3 -- Deux graphiques cote a cote
 
-Remplacer les statuts actuels par un workflow operationnel :
+**Gauche : "Vos revenus jour par jour" (AreaChart)**
+- Courbe du CA quotidien des commandes livrees sur la periode
+- Gradient violet (meme style que `RevenueChart`)
+- Sous-titre : "Combien vous avez gagne chaque jour grace aux commandes livrees"
 
-```text
-new -> caller_pending -> confirmed -> preparing -> ready -> in_transit -> delivered
-                      -> cancelled (a tout moment)
-                      -> returned (apres livraison)
-```
+**Droite : "Qui fait quoi dans l'equipe ?" (BarChart vertical)**
+- Une barre par membre de l'equipe, coloree selon le role
+- Valeur = nombre de commandes traitees (`ordersHandled`)
+- Sous-titre : "Nombre de commandes gerees par chaque membre de votre equipe"
+- Couleurs : bleu (caller), ambre (preparateur), vert (livreur)
 
-Chaque statut est associe a un role qui le traite :
-- `new` / `caller_pending` / `confirmed` : Caller
-- `preparing` / `ready` : Preparateur
-- `in_transit` / `delivered` / `returned` : Livreur
+---
 
-### 4. Nouvelle page Equipe (`/dashboard/team`)
+### Section 4 -- "Vos livreurs en detail" (Tableau simple)
 
-Page de gestion du personnel incluse dans le pack gratuit :
-- Liste des membres avec leur role (caller, preparateur, livreur)
-- Indicateur du quota (ex: "1/1 callers utilises")
-- Performance basique (commandes traitees par personne)
-- Bouton "Ajouter" qui redirige vers le module payant si quota atteint
+Un tableau Card avec les colonnes :
+- Nom du livreur
+- Commandes traitees
+- Un badge de performance (Excellent / Bon / A suivre) base sur le nombre de commandes
 
-### 5. Refonte de la page Commandes
+Sous-titre : "Un resume de l'activite de chaque livreur"
 
-La page Commandes devient un **tableau de bord operationnel** avec :
-- **Vue Kanban** par etape du pipeline (colonnes : Nouvelles > Caller > Preparation > Pret > En livraison > Livre)
-- **Filtrage par role** : un caller ne voit que ses commandes a confirmer, un preparateur ses commandes a preparer
-- **Actions contextuelles** : chaque etape a ses propres boutons (ex: "Confirmer la commande" pour le caller, "Marquer comme pret" pour le preparateur)
+---
 
-### 6. Sidebar mise a jour
+## Fichiers
 
-Ajouter l'entree "Equipe" dans la section Principal de la sidebar, accessible gratuitement.
+### Nouveau : `src/pages/Statistics.tsx`
+- Page complete avec `DashboardLayout`
+- Calculs dynamiques via `useMemo` depuis `initialOrders` et `mockTeamMembers`
+- Utilise `ChartContainer`, `ChartTooltip`, `ChartTooltipContent` (pattern existant)
+- Recharts : `BarChart`, `Bar`, `AreaChart`, `Area`, `XAxis`, `YAxis`, `CartesianGrid`, `Cell`
+- Chaque section a un titre en gros + sous-titre explicatif en `text-muted-foreground`
+- Selecteur de periode en haut (`Select` de shadcn)
+
+### Modification : `src/App.tsx`
+- Ajouter `import Statistics from "./pages/Statistics"`
+- Ajouter `<Route path="/dashboard/stats" element={<Statistics />} />`
+
+La sidebar contient deja le lien "Statistiques" vers `/dashboard/stats`, aucune modification necessaire.
 
 ## Details techniques
 
-### Fichiers a creer
-
-- `src/lib/team-roles.ts` : Definition des roles, quotas par module, et types TypeScript
-- `src/pages/Team.tsx` : Page de gestion de l'equipe avec mock data
-- `src/components/orders/OrderPipeline.tsx` : Vue Kanban du pipeline de commandes
-
-### Fichiers a modifier
-
-- `src/lib/modules-registry.ts` : Ajouter module `team_basic` (gratuit), `extra_callers`, `extra_preparers`, `extra_drivers`, `call_center`, `warehouse_team`
-- `src/pages/Orders.tsx` : Refonte avec pipeline 4 etapes et statuts operationnels
-- `src/pages/Deliveries.tsx` : Lier les livraisons aux livreurs de l'equipe
-- `src/components/dashboard/DashboardSidebar.tsx` : Ajouter entree "Equipe"
-- `src/App.tsx` : Ajouter route `/dashboard/team`
-
-### Structure des quotas par defaut
-
-```text
-Pack gratuit :  1 admin, 1 caller, 1 preparateur, 1 livreur
-+extra_callers : +3 callers (total 4)
-+extra_preparers : +3 preparateurs (total 4)
-+extra_drivers : +3 livreurs (total 4)
-+call_center : callers illimites
-+warehouse_team : preparateurs illimites
-+multi_delivery (existant) : livreurs illimites
-```
+- Taux de confirmation = commandes (confirmed + preparing + ready + in_transit + delivered) / (total - new) x 100
+- Taux de livraison = delivered / (in_transit + delivered + returned) x 100
+- Panier moyen = somme des totaux des commandes livrees / nombre de commandes livrees
+- Temps de preparation : simule a partir des donnees existantes (pas de timestamps par etape), affiche une valeur estimee
+- Performance livreur : basee sur `ordersHandled` de `mockTeamMembers` filtre par role "livreur"
+- Toutes les donnees sont calculees depuis `initialOrders` et `mockTeamMembers` -- pas de donnees en dur
+- Labels 100% generiques, aucune reference a un secteur d'activite specifique
 
