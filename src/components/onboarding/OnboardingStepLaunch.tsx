@@ -4,6 +4,7 @@ import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useModules } from "@/contexts/ModulesContext";
 import { useEffect } from "react";
+import { markOnboardingComplete } from "@/lib/auth-store";
 
 interface Props {
   data: OnboardingData;
@@ -12,9 +13,10 @@ interface Props {
 export const OnboardingStepLaunch = ({ data }: Props) => {
   const { setModules } = useModules();
 
-  // Save selected modules to context (and localStorage) when this step mounts
+  // Save selected modules and mark onboarding complete
   useEffect(() => {
     setModules(data.modules);
+    markOnboardingComplete();
   }, [data.modules, setModules]);
 
   const sectorLabels: Record<string, string> = {

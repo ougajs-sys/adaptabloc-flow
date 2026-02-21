@@ -2,9 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ModulesProvider } from "@/contexts/ModulesContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
@@ -22,8 +22,46 @@ import PreparateurWorkspace from "./pages/workspace/PreparateurWorkspace";
 import LivreurWorkspace from "./pages/workspace/LivreurWorkspace";
 import NotFound from "./pages/NotFound";
 import Statistics from "./pages/Statistics";
+import Help from "./pages/Help";
+import Campaigns from "./pages/Campaigns";
+import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!user?.has_completed_onboarding) return <Navigate to="/onboarding" replace />;
+
+  return <>{children}</>;
+}
+
+const AppRoutes = () => (
+  <Routes>
+    <Route path="/" element={<Landing />} />
+    <Route path="/login" element={<Login />} />
+    <Route path="/onboarding" element={<Onboarding />} />
+    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/dashboard/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+    <Route path="/dashboard/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+    <Route path="/dashboard/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+    <Route path="/dashboard/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
+    <Route path="/dashboard/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+    <Route path="/dashboard/modules" element={<ProtectedRoute><ModulesManagement /></ProtectedRoute>} />
+    <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+    <Route path="/dashboard/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+    <Route path="/dashboard/stats" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
+    <Route path="/dashboard/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+    <Route path="/dashboard/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/caller" element={<ProtectedRoute><CallerWorkspace /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute><PreparateurWorkspace /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
+    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,26 +71,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/orders" element={<Orders />} />
-              <Route path="/dashboard/products" element={<Products />} />
-              <Route path="/dashboard/customers" element={<Customers />} />
-              <Route path="/dashboard/deliveries" element={<Deliveries />} />
-              <Route path="/dashboard/team" element={<Team />} />
-              <Route path="/dashboard/modules" element={<ModulesManagement />} />
-              <Route path="/dashboard/settings" element={<Settings />} />
-              <Route path="/dashboard/billing" element={<Billing />} />
-              <Route path="/dashboard/stats" element={<Statistics />} />
-              <Route path="/dashboard/workspace/caller" element={<CallerWorkspace />} />
-              <Route path="/dashboard/workspace/preparateur" element={<PreparateurWorkspace />} />
-              <Route path="/dashboard/workspace/livreur" element={<LivreurWorkspace />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppRoutes />
           </BrowserRouter>
         </ModulesProvider>
       </AuthProvider>

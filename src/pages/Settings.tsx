@@ -13,9 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useModules } from "@/contexts/ModulesContext";
 import { modulesRegistry } from "@/lib/modules-registry";
 import {
-  getSubscription, getPlanById, mockInvoices, mockPaymentMethods,
+  mockInvoices, mockPaymentMethods,
   type PaymentMethod,
 } from "@/lib/billing-store";
+import { getModuleById } from "@/lib/modules-registry";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -196,8 +197,6 @@ function NotificationsTab() {
 function BillingTab() {
   const { activeModules, monthlyPrice } = useModules();
   const navigate = useNavigate();
-  const subscription = getSubscription();
-  const currentPlan = getPlanById(subscription.planId);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
 
   const paidModules = activeModules
@@ -239,7 +238,7 @@ function BillingTab() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <CreditCard size={18} className="text-primary" />
-            Abonnement actuel
+            Coût mensuel
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -247,16 +246,16 @@ function BillingTab() {
             <div>
               <div className="flex items-end gap-2 mb-2">
                 <span className="text-3xl font-bold font-[Space_Grotesk] text-foreground">
-                  {currentPlan?.price.toLocaleString("fr-FR") ?? "0"}
+                  {monthlyPrice.toLocaleString("fr-FR")}
                 </span>
                 <span className="text-sm text-muted-foreground mb-1">FCFA / mois</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Plan <strong className="text-foreground">{currentPlan?.name ?? "Gratuit"}</strong> — prochaine facturation : {subscription.nextBilling}
+                Basé sur <strong className="text-foreground">{paidModules.length} module{paidModules.length > 1 ? "s" : ""} payant{paidModules.length > 1 ? "s" : ""}</strong>
               </p>
             </div>
             <Button size="sm" onClick={() => navigate("/dashboard/billing")} className="gap-2">
-              <Zap size={14} /> Changer de plan
+              <Zap size={14} /> Gérer les modules
             </Button>
           </div>
 
@@ -347,7 +346,7 @@ function BillingTab() {
               <TableRow>
                 <TableHead>Référence</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Plan</TableHead>
+                <TableHead>Modules</TableHead>
                 <TableHead>Montant</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -358,7 +357,7 @@ function BillingTab() {
                 <TableRow key={inv.id}>
                   <TableCell className="font-mono text-xs">{inv.id}</TableCell>
                   <TableCell className="text-sm">{new Date(inv.date).toLocaleDateString("fr-FR")}</TableCell>
-                  <TableCell className="text-sm">{inv.plan}</TableCell>
+                  <TableCell className="text-sm">{inv.modules.length > 0 ? inv.modules.map((id) => getModuleById(id)?.name ?? id).join(", ") : "Pack gratuit"}</TableCell>
                   <TableCell className="text-sm font-medium">{inv.amount.toLocaleString("fr-FR")} FCFA</TableCell>
                   <TableCell>{statusBadge(inv.status)}</TableCell>
                   <TableCell className="text-right">

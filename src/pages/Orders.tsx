@@ -13,10 +13,16 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Plus, Eye, Package, MapPin, Phone, LayoutGrid, List } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Search, Plus, Eye, Package, MapPin, Phone, LayoutGrid, List, Pencil, Trash2 } from "lucide-react";
 import { OrderPipeline, type PipelineOrder } from "@/components/orders/OrderPipeline";
 import { getStageByStatus, pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
 import { NewOrderDialog, type NewOrderFormValues } from "@/components/orders/NewOrderDialog";
+import { EditOrderDialog, type EditOrderFormValues } from "@/components/orders/EditOrderDialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Order {
   id: string;
@@ -117,6 +123,8 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
 
   const handleNewOrder = (values: NewOrderFormValues) => {
     const id = `CMD-${1240 + orderCounter++}`;
@@ -125,12 +133,7 @@ const Orders = () => {
       customer: values.customer,
       phone: values.phone,
       email: values.email,
-      items: values.items.map((i) => ({
-        name: i.name,
-        qty: i.qty,
-        price: i.price,
-        variant: i.variant || undefined,
-      })),
+      items: values.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, variant: i.variant || undefined })),
       total: values.items.reduce((s, i) => s + i.qty * i.price, 0),
       status: "new",
       paymentStatus: values.paymentStatus,
@@ -140,39 +143,47 @@ const Orders = () => {
     setOrders((prev) => [newOrder, ...prev]);
   };
 
+  const handleEditOrder = (values: EditOrderFormValues) => {
+    if (!editingOrder) return;
+    setOrders((prev) => prev.map((o) => o.id === editingOrder.id ? {
+      ...o,
+      customer: values.customer,
+      phone: values.phone,
+      email: values.email,
+      address: values.address,
+      paymentStatus: values.paymentStatus,
+      items: values.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, variant: i.variant || undefined })),
+      total: values.items.reduce((s, i) => s + i.qty * i.price, 0),
+    } : o));
+    toast({ title: "Commande modifiée" });
+  };
+
+  const handleDeleteOrder = () => {
+    if (!deletingOrder) return;
+    setOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+    setDeletingOrder(null);
+    toast({ title: "Commande supprimée" });
+  };
+
   const filtered = orders.filter((o) => {
-    const matchSearch =
-      o.id.toLowerCase().includes(search.toLowerCase()) ||
-      o.customer.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || o.customer.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
   const handleAdvance = useCallback((orderId: string, nextStatus: OrderPipelineStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
-    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)));
   }, []);
 
   const handleCancel = useCallback((orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o))
-    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o)));
   }, []);
 
   const pipelineOrders: PipelineOrder[] = filtered.map((o) => ({
-    id: o.id,
-    customer: o.customer,
-    phone: o.phone,
-    address: o.address,
-    total: o.total,
-    itemCount: o.items.length,
-    status: o.status,
-    assignee: o.assignee,
-    date: o.date,
+    id: o.id, customer: o.customer, phone: o.phone, address: o.address,
+    total: o.total, itemCount: o.items.length, status: o.status, assignee: o.assignee, date: o.date,
   }));
 
-  // Summary counts
   const total = orders.length;
   const inProgress = orders.filter((o) => ["caller_pending", "confirmed", "preparing", "ready", "in_transit"].includes(o.status)).length;
   const delivered = orders.filter((o) => o.status === "delivered").length;
@@ -180,36 +191,43 @@ const Orders = () => {
 
   return (
     <>
-    <NewOrderDialog
-      open={newOrderOpen}
-      onOpenChange={setNewOrderOpen}
-      onSubmit={handleNewOrder}
-    />
+    <NewOrderDialog open={newOrderOpen} onOpenChange={setNewOrderOpen} onSubmit={handleNewOrder} />
+    {editingOrder && (
+      <EditOrderDialog
+        open={!!editingOrder}
+        onOpenChange={(v) => { if (!v) setEditingOrder(null); }}
+        onSubmit={handleEditOrder}
+        defaultValues={{
+          customer: editingOrder.customer,
+          phone: editingOrder.phone,
+          email: editingOrder.email,
+          address: editingOrder.address,
+          paymentStatus: editingOrder.paymentStatus as "pending" | "paid" | "refunded",
+          items: editingOrder.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, variant: i.variant || "" })),
+        }}
+      />
+    )}
+    <AlertDialog open={!!deletingOrder} onOpenChange={(v) => { if (!v) setDeletingOrder(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer la commande {deletingOrder?.id} ?</AlertDialogTitle>
+          <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <DashboardLayout
       title="Commandes"
       actions={
         <div className="flex items-center gap-2">
           <div className="flex rounded-md border border-border overflow-hidden">
-            <Button
-              size="sm"
-              variant={viewMode === "kanban" ? "default" : "ghost"}
-              className="rounded-none h-8 px-2"
-              onClick={() => setViewMode("kanban")}
-            >
-              <LayoutGrid size={14} />
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === "list" ? "default" : "ghost"}
-              className="rounded-none h-8 px-2"
-              onClick={() => setViewMode("list")}
-            >
-              <List size={14} />
-            </Button>
+            <Button size="sm" variant={viewMode === "kanban" ? "default" : "ghost"} className="rounded-none h-8 px-2" onClick={() => setViewMode("kanban")}><LayoutGrid size={14} /></Button>
+            <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} className="rounded-none h-8 px-2" onClick={() => setViewMode("list")}><List size={14} /></Button>
           </div>
-          <Button size="sm" className="gap-2" onClick={() => setNewOrderOpen(true)}>
-            <Plus size={16} /> Nouvelle commande
-          </Button>
+          <Button size="sm" className="gap-2" onClick={() => setNewOrderOpen(true)}><Plus size={16} /> Nouvelle commande</Button>
         </div>
       }
     >
@@ -234,35 +252,19 @@ const Orders = () => {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher par ID ou client..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Rechercher par ID ou client..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Tous les statuts" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tous les statuts" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
-            {pipelineStages.map((s) => (
-              <SelectItem key={s.status} value={s.status}>
-                {s.label}
-              </SelectItem>
-            ))}
+            {pipelineStages.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Kanban or List view */}
       {viewMode === "kanban" ? (
-        <OrderPipeline
-          orders={pipelineOrders}
-          onAdvance={handleAdvance}
-          onCancel={handleCancel}
-        />
+        <OrderPipeline orders={pipelineOrders} onAdvance={handleAdvance} onCancel={handleCancel} />
       ) : (
         <Card className="border-border/60">
           <CardContent className="p-0">
@@ -276,7 +278,7 @@ const Orders = () => {
                   <TableHead>Paiement</TableHead>
                   <TableHead>Étape</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,21 +296,15 @@ const Orders = () => {
                       </TableCell>
                       <TableCell>{order.items.length} article{order.items.length > 1 ? "s" : ""}</TableCell>
                       <TableCell className="font-medium">{order.total.toLocaleString("fr-FR")} F</TableCell>
+                      <TableCell><Badge variant={payment.variant} className="text-xs">{payment.label}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className={`text-xs ${stage.color} border-0`}>{stage.label}</Badge></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{new Date(order.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</TableCell>
                       <TableCell>
-                        <Badge variant={payment.variant} className="text-xs">{payment.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${stage.color} border-0`}>
-                          {stage.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(order.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(order)}>
-                          <Eye size={16} />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(order)}><Eye size={14} /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => setEditingOrder(order)}><Pencil size={14} /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingOrder(order)}><Trash2 size={14} /></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -325,37 +321,18 @@ const Orders = () => {
           {selectedOrder && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-[Space_Grotesk]">
-                  Commande {selectedOrder.id}
-                </DialogTitle>
+                <DialogTitle className="font-[Space_Grotesk]">Commande {selectedOrder.id}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className={`${getStageByStatus(selectedOrder.status).color} border-0`}>
-                    {getStageByStatus(selectedOrder.status).label}
-                  </Badge>
-                  <Badge variant={paymentConfig[selectedOrder.paymentStatus].variant}>
-                    {paymentConfig[selectedOrder.paymentStatus].label}
-                  </Badge>
+                  <Badge variant="outline" className={`${getStageByStatus(selectedOrder.status).color} border-0`}>{getStageByStatus(selectedOrder.status).label}</Badge>
+                  <Badge variant={paymentConfig[selectedOrder.paymentStatus].variant}>{paymentConfig[selectedOrder.paymentStatus].label}</Badge>
                 </div>
-
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Phone size={14} />
-                    <span>{selectedOrder.customer} — {selectedOrder.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin size={14} />
-                    <span>{selectedOrder.address}</span>
-                  </div>
-                  {selectedOrder.assignee && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Package size={14} />
-                      <span>Assigné à : {selectedOrder.assignee}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 text-muted-foreground"><Phone size={14} /><span>{selectedOrder.customer} — {selectedOrder.phone}</span></div>
+                  <div className="flex items-center gap-2 text-muted-foreground"><MapPin size={14} /><span>{selectedOrder.address}</span></div>
+                  {selectedOrder.assignee && <div className="flex items-center gap-2 text-muted-foreground"><Package size={14} /><span>Assigné à : {selectedOrder.assignee}</span></div>}
                 </div>
-
                 <div className="border-t border-border pt-3">
                   <p className="text-sm font-medium mb-2">Articles</p>
                   <div className="space-y-2">
@@ -363,9 +340,7 @@ const Orders = () => {
                       <div key={i} className="flex justify-between text-sm">
                         <div>
                           <span>{item.name}</span>
-                          {item.variant && (
-                            <span className="text-xs text-muted-foreground ml-1">({item.variant})</span>
-                          )}
+                          {item.variant && <span className="text-xs text-muted-foreground ml-1">({item.variant})</span>}
                           <span className="text-muted-foreground"> ×{item.qty}</span>
                         </div>
                         <span className="font-medium">{(item.price * item.qty).toLocaleString("fr-FR")} F</span>
@@ -376,6 +351,14 @@ const Orders = () => {
                     <span>Total</span>
                     <span>{selectedOrder.total.toLocaleString("fr-FR")} F</span>
                   </div>
+                </div>
+                <div className="flex gap-2 pt-2 border-t border-border">
+                  <Button variant="outline" className="flex-1 gap-2" onClick={() => { setSelectedOrder(null); setEditingOrder(selectedOrder); }}>
+                    <Pencil size={14} /> Modifier
+                  </Button>
+                  <Button variant="destructive" className="flex-1 gap-2" onClick={() => { setSelectedOrder(null); setDeletingOrder(selectedOrder); }}>
+                    <Trash2 size={14} /> Supprimer
+                  </Button>
                 </div>
               </div>
             </>
