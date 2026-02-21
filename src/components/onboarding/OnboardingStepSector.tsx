@@ -1,6 +1,7 @@
 import { OnboardingData } from "@/pages/Onboarding";
 import { Button } from "@/components/ui/button";
 import { ShoppingBag, Truck, Shirt, Apple, Sparkles, Wand2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 const sectors = [
   {
@@ -58,13 +59,18 @@ export const OnboardingStepSector = ({ data, updateData, onNext }: Props) => {
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {sectors.map((s) => {
+        {sectors.map((s, i) => {
           const selected = data.sector === s.id;
           return (
-            <button
+            <motion.button
               key={s.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.07, ease: "easeOut" }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => updateData({ sector: s.id })}
-              className={`flex flex-col items-start gap-3 p-4 rounded-xl border text-left transition-all min-h-[140px] ${
+              className={`flex flex-col items-start gap-3 p-4 rounded-xl border text-left transition-colors min-h-[140px] ${
                 selected
                   ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border bg-card hover:border-primary/30"
@@ -88,7 +94,7 @@ export const OnboardingStepSector = ({ data, updateData, onNext }: Props) => {
                   {s.description}
                 </span>
               </div>
-            </button>
+            </motion.button>
           );
         })}
       </div>
