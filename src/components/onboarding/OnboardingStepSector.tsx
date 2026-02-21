@@ -3,12 +3,42 @@ import { Button } from "@/components/ui/button";
 import { ShoppingBag, Truck, Shirt, Apple, Sparkles, Wand2 } from "lucide-react";
 
 const sectors = [
-  { id: "ecommerce", label: "E-commerce & Retail", icon: ShoppingBag },
-  { id: "transport", label: "Transport & Logistique", icon: Truck },
-  { id: "mode", label: "Prêt-à-porter / Mode", icon: Shirt },
-  { id: "epicerie", label: "Épicerie / Frais", icon: Apple },
-  { id: "beaute", label: "Institut Beauté / Spa", icon: Sparkles },
-  { id: "autre", label: "Autre — Créer mon système sur mesure", icon: Wand2 },
+  {
+    id: "ecommerce",
+    label: "E-commerce & Retail",
+    description: "Gestion complète : Commandes, Appelants & Livraison",
+    icon: ShoppingBag,
+  },
+  {
+    id: "transport",
+    label: "Transport & Logistique",
+    description: "Flotte mixte, Dispatch & Tracking en temps réel",
+    icon: Truck,
+  },
+  {
+    id: "mode",
+    label: "Prêt-à-porter / Mode",
+    description: "Gestion tailles, couleurs & collections",
+    icon: Shirt,
+  },
+  {
+    id: "epicerie",
+    label: "Épicerie / Frais",
+    description: "Péremptions, poids & fournisseurs",
+    icon: Apple,
+  },
+  {
+    id: "beaute",
+    label: "Institut Beauté / Spa",
+    description: "Rendez-vous, soins & fidélité client",
+    icon: Sparkles,
+  },
+  {
+    id: "autre",
+    label: "Autre",
+    description: "Créez votre système sur mesure avec notre IA",
+    icon: Wand2,
+  },
 ];
 
 interface Props {
@@ -20,32 +50,47 @@ interface Props {
 export const OnboardingStepSector = ({ data, updateData, onNext }: Props) => {
   return (
     <div>
-      <h2 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-2">Quel est votre secteur ?</h2>
+      <h2 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-2">
+        Quel est votre secteur ?
+      </h2>
       <p className="text-muted-foreground mb-8">
-        EasyFlow s'adapte à votre activité. Choisissez pour obtenir une configuration optimale.
+        Choisissez votre secteur, l'IA déploie les modules adaptés à vos processus.
       </p>
 
-      <div className="grid gap-3">
-        {sectors.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => updateData({ sector: s.id })}
-            className={`flex items-center gap-4 p-4 rounded-xl border text-left transition-all ${
-              data.sector === s.id
-                ? "border-primary bg-primary/5 shadow-sm"
-                : "border-border bg-card hover:border-primary/30"
-            }`}
-          >
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                data.sector === s.id ? "bg-primary/15" : "bg-muted"
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sectors.map((s) => {
+          const selected = data.sector === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => updateData({ sector: s.id })}
+              className={`flex flex-col items-start gap-3 p-4 rounded-xl border text-left transition-all min-h-[140px] ${
+                selected
+                  ? "border-primary bg-primary/5 shadow-sm"
+                  : "border-border bg-card hover:border-primary/30"
               }`}
             >
-              <s.icon size={20} className={data.sector === s.id ? "text-primary" : "text-muted-foreground"} />
-            </div>
-            <span className="font-medium text-foreground">{s.label}</span>
-          </button>
-        ))}
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  selected ? "bg-primary/15" : "bg-muted"
+                }`}
+              >
+                <s.icon
+                  size={20}
+                  className={selected ? "text-primary" : "text-muted-foreground"}
+                />
+              </div>
+              <div>
+                <span className="font-semibold text-sm text-foreground block leading-tight">
+                  {s.label}
+                </span>
+                <span className="text-xs text-muted-foreground mt-1 block leading-relaxed">
+                  {s.description}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-8 flex justify-end">
