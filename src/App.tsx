@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import Statistics from "./pages/Statistics";
 import Help from "./pages/Help";
 import Campaigns from "./pages/Campaigns";
+import EmbedForms from "./pages/EmbedForms";
 import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/stats" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
     <Route path="/dashboard/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
     <Route path="/dashboard/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+    <Route path="/dashboard/forms" element={<ProtectedRoute><EmbedForms /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/caller" element={<ProtectedRoute><CallerWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute><PreparateurWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
