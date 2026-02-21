@@ -14,6 +14,7 @@ import Deliveries from "./pages/Deliveries";
 import Team from "./pages/Team";
 import ModulesManagement from "./pages/ModulesManagement";
 import Settings from "./pages/Settings";
+import Billing from "./pages/Billing";
 import CallerWorkspace from "./pages/workspace/CallerWorkspace";
 import PreparateurWorkspace from "./pages/workspace/PreparateurWorkspace";
 import LivreurWorkspace from "./pages/workspace/LivreurWorkspace";
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/dashboard/team" element={<Team />} />
             <Route path="/dashboard/modules" element={<ModulesManagement />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/billing" element={<Billing />} />
             <Route path="/dashboard/stats" element={<Statistics />} />
             <Route path="/dashboard/workspace/caller" element={<CallerWorkspace />} />
             <Route path="/dashboard/workspace/preparateur" element={<PreparateurWorkspace />} />
