@@ -11,6 +11,7 @@ import {
   Zap,
   Lock,
   Boxes,
+  CreditCard,
   UsersRound,
   Phone,
   PackageCheck,
@@ -59,6 +60,7 @@ const toolItems: SidebarItem[] = [
 
 const bottomItems: SidebarItem[] = [
   { title: "Modules", url: "/dashboard/modules", icon: Boxes },
+  { title: "Abonnement", url: "/dashboard/billing", icon: CreditCard },
   { title: "Paramètres", url: "/dashboard/settings", icon: Settings },
   { title: "Aide", url: "/dashboard/help", icon: HelpCircle },
 ];
