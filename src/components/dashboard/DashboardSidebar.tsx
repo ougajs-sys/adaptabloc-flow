@@ -12,6 +12,7 @@ import {
   Lock,
   Boxes,
   CreditCard,
+  FormInput,
   UsersRound,
   Phone,
   PackageCheck,
@@ -59,6 +60,7 @@ const workspaceItems: SidebarItem[] = [
 const toolItems: SidebarItem[] = [
   { title: "Statistiques", url: "/dashboard/stats", icon: BarChart3 },
   { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns" },
+  { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredModule: "embed_forms" },
 ];
 
 const bottomItems: SidebarItem[] = [

@@ -320,6 +320,19 @@ export const modulesRegistry: ModuleDefinition[] = [
     features: ["ai_chat", "ai_recommendations", "ai_reports"],
     category: "Outils",
   },
+
+  // === TIER 2 – Formulaire embarqué ===
+  {
+    id: "embed_forms",
+    name: "Formulaire embarqué",
+    description: "Créez des formulaires de commande et intégrez-les sur vos landing pages WP, HTML ou Elementor.",
+    icon: FormInput,
+    tier: "tier2",
+    price: 5000,
+    routes: ["/dashboard/forms"],
+    features: ["form_builder", "form_embed_code", "form_order_capture", "form_analytics"],
+    category: "Outils",
+  },
 ];
 
 // Free module IDs (always active)
