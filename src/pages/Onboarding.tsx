@@ -4,6 +4,7 @@ import { OnboardingStepSector } from "@/components/onboarding/OnboardingStepSect
 import { OnboardingStepModules } from "@/components/onboarding/OnboardingStepModules";
 import { OnboardingStepInfo } from "@/components/onboarding/OnboardingStepInfo";
 import { OnboardingStepLaunch } from "@/components/onboarding/OnboardingStepLaunch";
+import { OnboardingStepCustom } from "@/components/onboarding/OnboardingStepCustom";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
 
@@ -13,9 +14,8 @@ export interface OnboardingData {
   businessName: string;
   email: string;
   phone: string;
+  customSectorLabel?: string;
 }
-
-const steps = ["Secteur", "Modules", "Infos", "Lancement"];
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
@@ -27,6 +27,12 @@ const Onboarding = () => {
     phone: "",
   });
 
+  // Dynamic steps based on sector choice
+  const isCustom = data.sector === "autre";
+  const steps = isCustom
+    ? ["Secteur", "Personnalisation", "Infos", "Lancement"]
+    : ["Secteur", "Modules", "Infos", "Lancement"];
+
   const progress = ((step + 1) / steps.length) * 100;
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -34,6 +40,15 @@ const Onboarding = () => {
 
   const updateData = (partial: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...partial }));
+  };
+
+  const renderStep = () => {
+    if (step === 0) return <OnboardingStepSector data={data} updateData={updateData} onNext={next} />;
+    if (step === 1 && isCustom) return <OnboardingStepCustom data={data} updateData={updateData} onNext={next} onBack={back} />;
+    if (step === 1) return <OnboardingStepModules data={data} updateData={updateData} onNext={next} onBack={back} />;
+    if (step === 2) return <OnboardingStepInfo data={data} updateData={updateData} onNext={next} onBack={back} />;
+    if (step === 3) return <OnboardingStepLaunch data={data} />;
+    return null;
   };
 
   return (
@@ -62,16 +77,13 @@ const Onboarding = () => {
       <div className="flex-1 container mx-auto px-4 py-10 max-w-2xl">
         <AnimatePresence mode="wait">
           <motion.div
-            key={step}
+            key={`${step}-${isCustom}`}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
-            {step === 0 && <OnboardingStepSector data={data} updateData={updateData} onNext={next} />}
-            {step === 1 && <OnboardingStepModules data={data} updateData={updateData} onNext={next} onBack={back} />}
-            {step === 2 && <OnboardingStepInfo data={data} updateData={updateData} onNext={next} onBack={back} />}
-            {step === 3 && <OnboardingStepLaunch data={data} />}
+            {renderStep()}
           </motion.div>
         </AnimatePresence>
       </div>

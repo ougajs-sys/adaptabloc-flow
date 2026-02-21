@@ -1,6 +1,6 @@
 import { OnboardingData } from "@/pages/Onboarding";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Truck, Shirt, Apple, Sparkles } from "lucide-react";
+import { ShoppingBag, Truck, Shirt, Apple, Sparkles, Wand2 } from "lucide-react";
 
 const sectors = [
   { id: "ecommerce", label: "E-commerce & Retail", icon: ShoppingBag },
@@ -8,6 +8,7 @@ const sectors = [
   { id: "mode", label: "Prêt-à-porter / Mode", icon: Shirt },
   { id: "epicerie", label: "Épicerie / Frais", icon: Apple },
   { id: "beaute", label: "Institut Beauté / Spa", icon: Sparkles },
+  { id: "autre", label: "Autre — Créer mon système sur mesure", icon: Wand2 },
 ];
 
 interface Props {
