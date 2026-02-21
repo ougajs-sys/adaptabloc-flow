@@ -15,7 +15,10 @@ import {
   UsersRound,
   Phone,
   PackageCheck,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useModules } from "@/contexts/ModulesContext";
 import {
@@ -99,6 +102,36 @@ function SidebarNavItem({ item }: { item: SidebarItem }) {
   );
 }
 
+function UserProfile() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  if (!user) return null;
+
+  return (
+    <div className="px-3 py-3 border-t border-sidebar-border mt-2">
+      <div className="flex items-center gap-3">
+        <img
+          src={user.avatar_url}
+          alt={user.name}
+          className="w-8 h-8 rounded-full object-cover"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+        </div>
+        <button
+          onClick={() => { logout(); navigate("/"); }}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Se déconnecter"
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -152,6 +185,7 @@ export function DashboardSidebar() {
             <SidebarNavItem key={item.title} item={item} />
           ))}
         </SidebarMenu>
+        <UserProfile />
       </SidebarFooter>
     </Sidebar>
   );
