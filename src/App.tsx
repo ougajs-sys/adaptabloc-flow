@@ -18,6 +18,7 @@ import CallerWorkspace from "./pages/workspace/CallerWorkspace";
 import PreparateurWorkspace from "./pages/workspace/PreparateurWorkspace";
 import LivreurWorkspace from "./pages/workspace/LivreurWorkspace";
 import NotFound from "./pages/NotFound";
+import Statistics from "./pages/Statistics";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/dashboard/team" element={<Team />} />
             <Route path="/dashboard/modules" element={<ModulesManagement />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/stats" element={<Statistics />} />
             <Route path="/dashboard/workspace/caller" element={<CallerWorkspace />} />
             <Route path="/dashboard/workspace/preparateur" element={<PreparateurWorkspace />} />
             <Route path="/dashboard/workspace/livreur" element={<LivreurWorkspace />} />
