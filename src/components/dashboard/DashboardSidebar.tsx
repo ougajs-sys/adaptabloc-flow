@@ -12,6 +12,8 @@ import {
   Lock,
   Boxes,
   UsersRound,
+  Phone,
+  PackageCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useModules } from "@/contexts/ModulesContext";
@@ -42,6 +44,12 @@ const mainItems: SidebarItem[] = [
   { title: "Produits", url: "/dashboard/products", icon: Package },
   { title: "Livraisons", url: "/dashboard/deliveries", icon: Truck },
   { title: "Équipe", url: "/dashboard/team", icon: UsersRound },
+];
+
+const workspaceItems: SidebarItem[] = [
+  { title: "Espace Caller", url: "/dashboard/workspace/caller", icon: Phone },
+  { title: "Espace Préparateur", url: "/dashboard/workspace/preparateur", icon: PackageCheck },
+  { title: "Espace Livreur", url: "/dashboard/workspace/livreur", icon: Truck },
 ];
 
 const toolItems: SidebarItem[] = [
@@ -107,6 +115,17 @@ export function DashboardSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
+                <SidebarNavItem key={item.title} item={item} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Espaces de travail</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {workspaceItems.map((item) => (
                 <SidebarNavItem key={item.title} item={item} />
               ))}
             </SidebarMenu>
