@@ -293,7 +293,7 @@ export const modulesRegistry: ModuleDefinition[] = [
   {
     id: "api",
     name: "API complète",
-    description: "Connectez EasyFlow à vos outils via une API REST complète.",
+    description: "Connectez Intramate à vos outils via une API REST complète.",
     icon: Code,
     tier: "tier3",
     price: 10000,

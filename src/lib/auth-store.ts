@@ -12,7 +12,7 @@ export interface User {
   has_completed_onboarding: boolean;
 }
 
-const STORAGE_KEY = "easyflow_user";
+const STORAGE_KEY = "intramate_user";
 
 export function saveUser(user: User): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));

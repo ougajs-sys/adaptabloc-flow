@@ -56,17 +56,17 @@ const Login = () => {
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg font-[Space_Grotesk]">EF</span>
+            <span className="text-primary-foreground font-bold text-lg font-[Space_Grotesk]">IM</span>
           </div>
           <span className="text-2xl font-bold font-[Space_Grotesk] text-foreground">
-            Easy<span className="text-primary">Flow</span>
+            Intra<span className="text-primary">mate</span>
           </span>
         </Link>
 
         {/* Headline */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-2">
-            Bienvenue sur EasyFlow
+            Bienvenue sur Intramate
           </h1>
           <p className="text-muted-foreground text-sm">
             Connectez-vous pour gérer votre boutique

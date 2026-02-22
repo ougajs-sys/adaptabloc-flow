@@ -79,15 +79,15 @@ const mockForms: EmbedForm[] = [
 ];
 
 function generateEmbedCode(form: EmbedForm, type: "html" | "wordpress" | "elementor"): string {
-  const baseUrl = "https://app.easyflow.africa/embed";
+  const baseUrl = "https://app.intramate.africa/embed";
   if (type === "html") {
-    return `<!-- EasyFlow Formulaire Embarqué -->
-<div id="easyflow-form-${form.id}"></div>
+    return `<!-- Intramate Formulaire Embarqué -->
+<div id="intramate-form-${form.id}"></div>
 <script src="${baseUrl}/sdk.js"></script>
 <script>
-  EasyFlow.init({
+  Intramate.init({
     formId: "${form.id}",
-    container: "#easyflow-form-${form.id}",
+    container: "#intramate-form-${form.id}",
     theme: {
       primaryColor: "${form.style.primaryColor}",
       borderRadius: "${form.style.borderRadius}"
@@ -96,19 +96,19 @@ function generateEmbedCode(form: EmbedForm, type: "html" | "wordpress" | "elemen
 </script>`;
   }
   if (type === "wordpress") {
-    return `[easyflow_form id="${form.id}" color="${form.style.primaryColor}" radius="${form.style.borderRadius}"]
+    return `[intramate_form id="${form.id}" color="${form.style.primaryColor}" radius="${form.style.borderRadius}"]
 
 <!-- Ou en shortcode PHP dans votre thème : -->
-<?php echo do_shortcode('[easyflow_form id="${form.id}"]'); ?>`;
+<?php echo do_shortcode('[intramate_form id="${form.id}"]'); ?>`;
   }
   return `<!-- Elementor : Ajouter un widget HTML personnalisé -->
 <!-- Collez ce code dans un widget "HTML" d'Elementor -->
-<div id="easyflow-form-${form.id}"></div>
+<div id="intramate-form-${form.id}"></div>
 <script src="${baseUrl}/sdk.js"></script>
 <script>
-  EasyFlow.init({
+  Intramate.init({
     formId: "${form.id}",
-    container: "#easyflow-form-${form.id}"
+    container: "#intramate-form-${form.id}"
   });
 </script>`;
 }
