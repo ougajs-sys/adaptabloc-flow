@@ -2,28 +2,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 
-const data = [
-  { month: "Jan", revenue: 420000, orders: 85 },
-  { month: "Fév", revenue: 580000, orders: 112 },
-  { month: "Mar", revenue: 650000, orders: 130 },
-  { month: "Avr", revenue: 510000, orders: 98 },
-  { month: "Mai", revenue: 720000, orders: 145 },
-  { month: "Jun", revenue: 890000, orders: 178 },
-  { month: "Jul", revenue: 950000, orders: 192 },
-];
-
 const chartConfig = {
   revenue: {
     label: "Chiffre d'affaires",
     color: "hsl(252, 85%, 60%)",
   },
-  orders: {
-    label: "Commandes",
-    color: "hsl(168, 80%, 45%)",
-  },
 };
 
-export function RevenueChart() {
+interface Props {
+  data: { month: string; revenue: number; orders: number }[];
+}
+
+export function RevenueChart({ data }: Props) {
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2">
