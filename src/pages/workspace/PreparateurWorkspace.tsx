@@ -8,32 +8,28 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { PackageCheck, Package, CheckCircle2, ClipboardList } from "lucide-react";
-import { initialOrders, type Order } from "@/lib/orders-store";
+import { PackageCheck, Package, CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
+import { useWorkspaceOrders, type WorkspaceOrder } from "@/hooks/useWorkspaceOrders";
 import { getStageByStatus, type OrderPipelineStatus } from "@/lib/team-roles";
 
 const PreparateurWorkspace = () => {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { orders, isLoading, todayStats, updateStatus } = useWorkspaceOrders([
+    "confirmed", "preparing", "ready",
+  ]);
+  const [selectedOrder, setSelectedOrder] = useState<WorkspaceOrder | null>(null);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
   const [note, setNote] = useState("");
 
-  // Préparateur sees: confirmed + preparing
   const prepOrders = orders.filter((o) => ["confirmed", "preparing"].includes(o.status));
-  const readyToday = orders.filter(
-    (o) => o.status === "ready" && new Date(o.date).toDateString() === new Date().toDateString()
-  ).length;
 
-  const handleStartPrep = useCallback((order: Order) => {
+  const handleStartPrep = useCallback((order: WorkspaceOrder) => {
     if (order.status === "confirmed") {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === order.id ? { ...o, status: "preparing" as OrderPipelineStatus } : o))
-      );
+      updateStatus.mutate({ dbId: order.dbId, status: "preparing" });
     }
     setSelectedOrder(order);
     setCheckedItems({});
     setNote("");
-  }, []);
+  }, [updateStatus]);
 
   const allChecked = selectedOrder
     ? selectedOrder.items.every((_, i) => checkedItems[i])
@@ -41,15 +37,21 @@ const PreparateurWorkspace = () => {
 
   const handleMarkReady = useCallback(() => {
     if (!selectedOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === selectedOrder.id
-          ? { ...o, status: "ready" as OrderPipelineStatus, prepNote: note || undefined }
-          : o
-      )
+    updateStatus.mutate(
+      { dbId: selectedOrder.dbId, status: "ready", notes: note || undefined },
+      { onSuccess: () => setSelectedOrder(null) }
     );
-    setSelectedOrder(null);
-  }, [selectedOrder, note]);
+  }, [selectedOrder, note, updateStatus]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Espace Préparateur" subtitle="Préparation des colis">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>
@@ -69,7 +71,6 @@ const PreparateurWorkspace = () => {
                   <span className="font-medium text-foreground">{selectedOrder.customer}</span> — {selectedOrder.address}
                 </div>
 
-                {/* Checklist */}
                 <div>
                   <p className="text-sm font-medium mb-2 flex items-center gap-1">
                     <ClipboardList size={14} /> Liste de colisage
@@ -112,7 +113,7 @@ const PreparateurWorkspace = () => {
               </div>
 
               <DialogFooter>
-                <Button onClick={handleMarkReady} disabled={!allChecked} className="gap-1">
+                <Button onClick={handleMarkReady} disabled={!allChecked || updateStatus.isPending} className="gap-1">
                   <CheckCircle2 size={16} /> Colis prêt
                 </Button>
               </DialogFooter>
@@ -122,7 +123,6 @@ const PreparateurWorkspace = () => {
       </Dialog>
 
       <DashboardLayout title="Espace Préparateur" subtitle="Préparation des colis">
-        {/* KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
@@ -141,12 +141,11 @@ const PreparateurWorkspace = () => {
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Prêts aujourd'hui</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{readyToday}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{todayStats.ready}</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Order queue */}
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-[Space_Grotesk]">
@@ -164,7 +163,7 @@ const PreparateurWorkspace = () => {
               const isPreparing = order.status === "preparing";
               return (
                 <div
-                  key={order.id}
+                  key={order.dbId}
                   className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
                     isPreparing ? "border-amber-500/40 bg-amber-500/5" : "border-border/60 hover:bg-muted/30"
                   }`}
