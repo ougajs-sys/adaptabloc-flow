@@ -1,474 +1,327 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ModuleGate } from "@/components/modules/ModuleGate";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Copy, Eye, Code, BarChart3, Trash2, ExternalLink, Check, Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import {
+  Info, Copy, Check, Loader2, Package, User, Phone, Hash, MapPin, ChevronDown,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface FormStyle {
+  primaryColor: string;
+  brandName: string;
+  redirectUrl: string;
+  successMessage: string;
+}
+
+interface StoreProduct {
+  id: string;
+  name: string;
+  price: number;
+}
 
 interface EmbedForm {
   id: string;
   name: string;
   status: "active" | "draft" | "archived";
-  fields: FormField[];
+  fields: any[];
   style: FormStyle;
   created_at: string;
   submissions_count: number;
   conversions_count: number;
 }
 
-interface FormField {
-  id: string;
-  type: "text" | "email" | "phone" | "select" | "number" | "address";
-  label: string;
-  placeholder: string;
-  required: boolean;
-}
-
-interface FormStyle {
-  primaryColor: string;
-  borderRadius: string;
-  buttonText: string;
-  successMessage: string;
-}
-
-const defaultFields: FormField[] = [
-  { id: "1", type: "text", label: "Nom complet", placeholder: "Votre nom", required: true },
-  { id: "2", type: "phone", label: "Téléphone", placeholder: "+225 07 00 00 00", required: true },
-  { id: "3", type: "address", label: "Adresse de livraison", placeholder: "Votre adresse", required: true },
-  { id: "4", type: "select", label: "Produit", placeholder: "Choisir un produit", required: true },
-  { id: "5", type: "number", label: "Quantité", placeholder: "1", required: true },
-];
-
 const defaultStyle: FormStyle = {
-  primaryColor: "#6366f1",
-  borderRadius: "8px",
-  buttonText: "Commander maintenant",
-  successMessage: "Merci ! Votre commande a été enregistrée. Nous vous contacterons sous peu.",
+  primaryColor: "#8B5CF6",
+  brandName: "Ma Boutique",
+  redirectUrl: "https://votresite.com/merci",
+  successMessage: "Commande enregistrée avec succès",
 };
 
-function generateEmbedCode(form: EmbedForm, type: "html" | "wordpress" | "elementor"): string {
-  const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-form`;
-  
-  // Script to handle form submission
-  const scriptContent = `
-<script>
-  (function() {
-    const formId = "intramate-form-${form.id}";
-    const formElement = document.getElementById(formId);
-    
-    if (!formElement) return;
+// ─── Live Preview ────────────────────────────────────────────────
+function FormPreview({
+  style,
+  products,
+  selectedProductId,
+}: {
+  style: FormStyle;
+  products: StoreProduct[];
+  selectedProductId: string | null;
+}) {
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const price = selectedProduct?.price ?? 0;
+  const [qty, setQty] = useState(1);
+  const total = price * qty;
 
-    formElement.addEventListener("submit", async function(e) {
-      e.preventDefault();
-      const submitBtn = formElement.querySelector("button[type=submit]");
-      const originalText = submitBtn.innerText;
-      submitBtn.disabled = true;
-      submitBtn.innerText = "Traitement...";
-
-      const formData = new FormData(formElement);
-      const data = Object.fromEntries(formData.entries());
-
-      try {
-        const response = await fetch("${functionUrl}", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ formId: "${form.id}", data }),
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          formElement.innerHTML = \`<div style="padding: 20px; text-align: center; color: green; font-weight: bold;">\${result.message}</div>\`;
-        } else {
-          alert("Erreur: " + (result.error || "Une erreur est survenue"));
-          submitBtn.disabled = false;
-          submitBtn.innerText = originalText;
-        }
-      } catch (error) {
-        console.error("Error submitting form:", error);
-        alert("Erreur de connexion");
-        submitBtn.disabled = false;
-        submitBtn.innerText = originalText;
-      }
-    });
-  })();
-</script>`;
-
-  // HTML Form structure
-  const formHtml = `
-<div id="intramate-form-${form.id}" style="max-width: 400px; margin: 0 auto; font-family: sans-serif; border: 1px solid #e2e8f0; padding: 20px; border-radius: ${form.style.borderRadius}; background: #fff;">
-  <h3 style="margin-top: 0; margin-bottom: 20px; text-align: center;">Passer commande</h3>
-  <form style="display: flex; flex-direction: column; gap: 15px;">
-    ${form.fields.map(field => `
-    <div>
-      <label style="display: block; margin-bottom: 5px; font-size: 14px; font-weight: 500;">${field.label} ${field.required ? '<span style="color: red;">*</span>' : ''}</label>
-      ${field.type === 'select' ? `
-      <select name="${field.label}" ${field.required ? 'required' : ''} style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
-        <option value="">${field.placeholder}</option>
-        <option value="Produit A">Produit A</option>
-        <option value="Produit B">Produit B</option>
-      </select>` : `
-      <input type="${field.type === 'phone' ? 'tel' : field.type}" name="${field.label}" placeholder="${field.placeholder}" ${field.required ? 'required' : ''} style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;" />`}
-    </div>`).join('')}
-    <button type="submit" style="background-color: ${form.style.primaryColor}; color: white; padding: 10px; border: none; border-radius: ${form.style.borderRadius}; cursor: pointer; font-weight: bold; margin-top: 10px;">
-      ${form.style.buttonText}
-    </button>
-  </form>
-</div>`;
-
-  if (type === "html") {
-    return `<!-- Intramate Formulaire -->
-${formHtml}
-${scriptContent}`;
-  }
-  
-  if (type === "wordpress") {
-    return `<!-- Insérez ce code dans un bloc HTML personnalisé -->
-${formHtml}
-${scriptContent}`;
-  }
-  
-  return `<!-- Elementor Widget HTML -->
-${formHtml}
-${scriptContent}`;
-}
-
-function FormPreview({ form }: { form: EmbedForm }) {
   return (
-    <div
-      className="border rounded-lg p-6 bg-background max-w-md mx-auto"
-      style={{ borderRadius: form.style.borderRadius }}
-    >
-      <h3 className="text-lg font-semibold mb-4">Passer commande</h3>
-      <div className="space-y-3">
-        {form.fields.map((field) => (
-          <div key={field.id}>
-            <label className="text-sm font-medium text-muted-foreground mb-1 block">
-              {field.label} {field.required && <span className="text-destructive">*</span>}
-            </label>
-            {field.type === "select" ? (
-              <select className="w-full border rounded-md p-2 text-sm bg-background" disabled>
-                <option>{field.placeholder}</option>
-              </select>
-            ) : (
-              <input
-                type={field.type === "phone" ? "tel" : field.type}
-                placeholder={field.placeholder}
-                className="w-full border rounded-md p-2 text-sm bg-background"
-                disabled
-              />
-            )}
-          </div>
-        ))}
+    <div className="border rounded-xl p-5 bg-background space-y-4 text-sm">
+      <div>
+        <p className="text-xs text-muted-foreground">{style.brandName}</p>
+        <h3 className="text-lg font-bold">Commander maintenant</h3>
+        <p className="text-xs text-muted-foreground">
+          Remplissez le formulaire pour passer votre commande
+        </p>
       </div>
+
+      {/* Produit */}
+      <div>
+        <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+          <Package size={13} className="text-muted-foreground" /> Produit
+        </label>
+        <div className="border rounded-md p-2 flex items-center justify-between bg-muted/30">
+          <span className="text-muted-foreground text-sm">
+            {selectedProduct ? selectedProduct.name : "Sélectionner un produit"}
+          </span>
+          <ChevronDown size={14} className="text-muted-foreground" />
+        </div>
+      </div>
+
+      {/* Nom */}
+      <div>
+        <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+          <User size={13} className="text-muted-foreground" /> Nom complet
+        </label>
+        <input
+          className="w-full border rounded-md p-2 text-sm bg-background"
+          placeholder="Votre nom"
+          disabled
+        />
+      </div>
+
+      {/* Téléphone */}
+      <div>
+        <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+          <Phone size={13} className="text-muted-foreground" /> Téléphone
+        </label>
+        <input
+          className="w-full border rounded-md p-2 text-sm bg-background"
+          placeholder="+225 XX XX XX XX"
+          disabled
+        />
+      </div>
+
+      {/* Quantité */}
+      <div>
+        <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+          <Hash size={13} className="text-muted-foreground" /> Quantité
+        </label>
+        <input
+          className="w-full border rounded-md p-2 text-sm bg-background"
+          value={qty}
+          onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+          type="number"
+          min={1}
+        />
+      </div>
+
+      {/* Adresse */}
+      <div>
+        <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+          <MapPin size={13} className="text-muted-foreground" /> Adresse de livraison
+        </label>
+        <input
+          className="w-full border rounded-md p-2 text-sm bg-background"
+          placeholder="Votre adresse complète"
+          disabled
+        />
+      </div>
+
+      {/* Total */}
+      {selectedProduct && (
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-muted-foreground">Total à payer</span>
+          <span className="text-lg font-bold">{(total).toLocaleString("fr-FR")} FCFA</span>
+        </div>
+      )}
+
       <button
-        className="w-full mt-4 py-2.5 rounded-md text-white font-medium text-sm"
-        style={{ backgroundColor: form.style.primaryColor, borderRadius: form.style.borderRadius }}
+        className="w-full py-2.5 rounded-md text-white font-semibold text-sm"
+        style={{ backgroundColor: style.primaryColor }}
         disabled
       >
-        {form.style.buttonText}
+        Confirmer ma commande
       </button>
     </div>
   );
 }
 
-function FormBuilderDialog({
-  form,
-  onSave,
-  trigger,
-}: {
-  form?: EmbedForm;
-  onSave: (f: Partial<EmbedForm>) => void;
-  trigger: React.ReactNode;
-}) {
-  const [name, setName] = useState(form?.name ?? "");
-  const [fields, setFields] = useState<FormField[]>(form?.fields ?? [...defaultFields]);
-  const [style, setStyle] = useState<FormStyle>(form?.style ?? { ...defaultStyle });
-  const [open, setOpen] = useState(false);
+// ─── Code generator ──────────────────────────────────────────────
+function generateEmbedCode(
+  formId: string,
+  style: FormStyle,
+  selectedProduct: StoreProduct | null,
+  type: "elementor" | "wordpress" | "html"
+): string {
+  const baseUrl = `${window.location.origin}/embed/order`;
+  const params = new URLSearchParams({
+    brand: style.brandName,
+    color: style.primaryColor.replace("#", ""),
+    formId,
+    ...(style.redirectUrl && { redirect: style.redirectUrl }),
+    ...(selectedProduct && { productId: selectedProduct.id }),
+  });
 
-  const handleSave = () => {
-    onSave({
-      id: form?.id,
-      name: name || "Nouveau formulaire",
-      fields,
-      style,
-      status: form?.status || "draft",
-    });
-    setOpen(false);
-  };
+  const src = `${baseUrl}?${params.toString()}`;
 
-  const addField = () => {
-    setFields([
-      ...fields,
-      { id: String(Date.now()), type: "text", label: "Nouveau champ", placeholder: "", required: false },
-    ]);
-  };
+  if (type === "elementor") {
+    return `<!-- Code pour Elementor - Bloc HTML personnalisé -->
+<iframe
+  src="${src}"
+  width="100%"
+  height="650"
+  style="border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);"
+  title="Formulaire de commande"
+></iframe>`;
+  }
 
-  const removeField = (id: string) => setFields(fields.filter((f) => f.id !== id));
+  if (type === "wordpress") {
+    return `<!-- Shortcode WordPress - Collez dans un bloc HTML -->
+<iframe
+  src="${src}"
+  width="100%"
+  height="650"
+  style="border: none; border-radius: 12px;"
+  title="Formulaire de commande"
+></iframe>`;
+  }
 
-  const updateField = (id: string, updates: Partial<FormField>) =>
-    setFields(fields.map((f) => (f.id === id ? { ...f, ...updates } : f)));
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{form ? "Modifier le formulaire" : "Nouveau formulaire"}</DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Builder */}
-          <div className="space-y-4">
-            <div>
-              <Label>Nom du formulaire</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Landing Page Promo" />
-            </div>
-
-            <div>
-              <Label className="mb-2 block">Champs du formulaire</Label>
-              <div className="space-y-2">
-                {fields.map((field) => (
-                  <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/30">
-                    <Select
-                      value={field.type}
-                      onValueChange={(v) => updateField(field.id, { type: v as FormField["type"] })}
-                    >
-                      <SelectTrigger className="w-24 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="text">Texte</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="phone">Tél.</SelectItem>
-                        <SelectItem value="number">Nombre</SelectItem>
-                        <SelectItem value="address">Adresse</SelectItem>
-                        <SelectItem value="select">Liste</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={field.label}
-                      onChange={(e) => updateField(field.id, { label: e.target.value })}
-                      className="h-8 text-sm flex-1"
-                      placeholder="Label"
-                    />
-                    <div className="flex items-center gap-1">
-                      <Switch
-                        checked={field.required}
-                        onCheckedChange={(v) => updateField(field.id, { required: v })}
-                      />
-                      <span className="text-xs text-muted-foreground">Req.</span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeField(field.id)}>
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <Button variant="outline" size="sm" className="mt-2" onClick={addField}>
-                <Plus size={14} className="mr-1" /> Ajouter un champ
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Couleur principale</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={style.primaryColor}
-                    onChange={(e) => setStyle({ ...style, primaryColor: e.target.value })}
-                    className="w-8 h-8 rounded border cursor-pointer"
-                  />
-                  <Input
-                    value={style.primaryColor}
-                    onChange={(e) => setStyle({ ...style, primaryColor: e.target.value })}
-                    className="h-8 text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Rayon des bords</Label>
-                <Input
-                  value={style.borderRadius}
-                  onChange={(e) => setStyle({ ...style, borderRadius: e.target.value })}
-                  placeholder="8px"
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Texte du bouton</Label>
-              <Input
-                value={style.buttonText}
-                onChange={(e) => setStyle({ ...style, buttonText: e.target.value })}
-                className="text-sm"
-              />
-            </div>
-
-            <div>
-              <Label>Message de succès</Label>
-              <Textarea
-                value={style.successMessage}
-                onChange={(e) => setStyle({ ...style, successMessage: e.target.value })}
-                rows={2}
-                className="text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Preview */}
-          <div>
-            <Label className="mb-2 block">Aperçu</Label>
-            <div className="border rounded-lg p-4 bg-muted/20">
-              <FormPreview form={{ 
-                id: "preview", 
-                name, 
-                status: "draft", 
-                fields, 
-                style, 
-                created_at: "", 
-                submissions_count: 0, 
-                conversions_count: 0 
-              }} />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
-          <Button onClick={handleSave}>Enregistrer</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  return `<!-- HTML Simple - Copiez dans votre page -->
+<iframe
+  src="${src}"
+  width="100%"
+  height="650"
+  style="border: none; border-radius: 12px;"
+  title="Formulaire de commande"
+></iframe>`;
 }
 
+// ─── Main Component ──────────────────────────────────────────────
 const EmbedForms = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const { data: forms = [], isLoading } = useQuery({
-    queryKey: ['embed-forms', user?.store_id],
+  // Style state
+  const [style, setStyle] = useState<FormStyle>({ ...defaultStyle });
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+
+  // Fetch products
+  const { data: products = [] } = useQuery({
+    queryKey: ["products-for-form", user?.store_id],
     queryFn: async () => {
       if (!user?.store_id) return [];
-      const { data, error } = await supabase
-        .from('embed_forms')
-        .select('*')
-        .eq('store_id', user.store_id)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data.map(form => ({
-        ...form,
-        fields: form.fields as unknown as FormField[],
-        style: form.style as unknown as FormStyle
-      })) as EmbedForm[];
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, price")
+        .eq("store_id", user.store_id)
+        .eq("is_active", true)
+        .order("name");
+      return (data || []) as StoreProduct[];
     },
-    enabled: !!user?.store_id
+    enabled: !!user?.store_id,
   });
 
+  // Fetch existing form (use first one or create one)
+  const { data: form, isLoading } = useQuery({
+    queryKey: ["embed-form", user?.store_id],
+    queryFn: async () => {
+      if (!user?.store_id) return null;
+      const { data, error } = await supabase
+        .from("embed_forms")
+        .select("*")
+        .eq("store_id", user.store_id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        const s = data.style as any;
+        if (s?.primaryColor) {
+          setStyle({
+            primaryColor: s.primaryColor || defaultStyle.primaryColor,
+            brandName: s.brandName || defaultStyle.brandName,
+            redirectUrl: s.redirectUrl || defaultStyle.redirectUrl,
+            successMessage: s.successMessage || defaultStyle.successMessage,
+          });
+        }
+        return data as unknown as EmbedForm;
+      }
+      return null;
+    },
+    enabled: !!user?.store_id,
+  });
+
+  // Auto-create form if none exists
   const createMutation = useMutation({
-    mutationFn: async (form: Partial<EmbedForm>) => {
-      if (!user?.store_id) throw new Error("No store ID");
-      const { error } = await supabase
-        .from('embed_forms')
+    mutationFn: async () => {
+      if (!user?.store_id) throw new Error("No store");
+      const { data, error } = await supabase
+        .from("embed_forms")
         .insert({
           store_id: user.store_id,
-          name: form.name!,
-          fields: form.fields as any,
-          style: form.style as any,
-          status: 'draft'
-        });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
-      toast({ title: "Formulaire créé" });
-    }
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (form: Partial<EmbedForm>) => {
-      if (!form.id) throw new Error("No form ID");
-      const { error } = await supabase
-        .from('embed_forms')
-        .update({
-          name: form.name,
-          fields: form.fields as any,
-          style: form.style as any,
-          status: form.status
+          name: "Formulaire principal",
+          fields: [] as any,
+          style: style as any,
+          status: "active",
         })
-        .eq('id', form.id);
+        .select("id")
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
-      toast({ title: "Formulaire mis à jour" });
-    }
+      queryClient.invalidateQueries({ queryKey: ["embed-form"] });
+    },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  useEffect(() => {
+    if (!isLoading && !form && user?.store_id) {
+      createMutation.mutate();
+    }
+  }, [isLoading, form, user?.store_id]);
+
+  // Save style
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!form?.id) throw new Error("No form");
       const { error } = await supabase
-        .from('embed_forms')
-        .delete()
-        .eq('id', id);
+        .from("embed_forms")
+        .update({ style: style as any })
+        .eq("id", form.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
-      toast({ title: "Formulaire supprimé" });
-    }
+      queryClient.invalidateQueries({ queryKey: ["embed-form"] });
+      toast({ title: "Personnalisation sauvegardée" });
+    },
   });
 
-  const handleSaveForm = (form: Partial<EmbedForm>) => {
-    if (form.id) {
-      updateMutation.mutate(form);
-    } else {
-      createMutation.mutate(form);
-    }
-  };
+  const selectedProduct = products.find((p) => p.id === selectedProductId) || null;
 
-  const handleDelete = (id: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce formulaire ?")) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const handleToggleStatus = (form: EmbedForm) => {
-    updateMutation.mutate({
-      id: form.id,
-      status: form.status === "active" ? "draft" : "active"
-    });
-  };
-
-  const copyCode = (form: EmbedForm, type: "html" | "wordpress" | "elementor") => {
-    const code = generateEmbedCode(form, type);
+  const copyCode = (type: "elementor" | "wordpress" | "html") => {
+    if (!form) return;
+    const code = generateEmbedCode(form.id, style, selectedProduct, type);
     navigator.clipboard.writeText(code);
-    setCopiedId(`${form.id}-${type}`);
-    setTimeout(() => setCopiedId(null), 2000);
+    setCopiedType(type);
+    setTimeout(() => setCopiedType(null), 2000);
     toast({ title: "Code copié !" });
   };
 
   if (isLoading) {
     return (
-      <DashboardLayout title="Formulaires embarqués">
+      <DashboardLayout title="Formulaires Embarquables">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="animate-spin text-muted-foreground" size={32} />
         </div>
@@ -477,123 +330,213 @@ const EmbedForms = () => {
   }
 
   return (
-    <DashboardLayout title="Formulaires embarqués">
+    <DashboardLayout title="Formulaires Embarquables">
       <ModuleGate moduleId="embed_forms">
-        {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Formulaires actifs</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk]">{forms.filter((f) => f.status === "active").length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Total soumissions</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk]">{forms.reduce((s, f) => s + (f.submissions_count || 0), 0)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Taux de conversion</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk]">
-                {forms.reduce((s, f) => s + (f.submissions_count || 0), 0) > 0
-                  ? `${Math.round((forms.reduce((s, f) => s + (f.conversions_count || 0), 0) / forms.reduce((s, f) => s + (f.submissions_count || 0), 0)) * 100)}%`
-                  : "—"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-2xl font-bold font-[Space_Grotesk]">Formulaires Embarquables</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Générez des codes iframe pour intégrer vos formulaires de commande dans WordPress/Elementor
+            </p>
+          </div>
 
-        {/* Action bar */}
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Mes formulaires</h2>
-          <FormBuilderDialog
-            onSave={handleSaveForm}
-            trigger={
-              <Button size="sm">
-                <Plus size={16} className="mr-1" /> Nouveau formulaire
-              </Button>
-            }
-          />
-        </div>
+          {/* How it works */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Info size={18} className="text-primary mt-0.5 shrink-0" />
+              <div className="text-sm space-y-1">
+                <p className="font-semibold">Comment ça marche ?</p>
+                <ol className="list-decimal list-inside text-muted-foreground space-y-0.5">
+                  <li>Personnalisez votre branding ci-dessous</li>
+                  <li>Sélectionnez un produit (optionnel)</li>
+                  <li>Copiez le code généré dans votre page WordPress/Elementor</li>
+                  <li>Les commandes arriveront automatiquement dans la section "Commandes"</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Forms list */}
-        <div className="space-y-4">
-          {forms.map((form) => (
-            <Card key={form.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CardTitle className="text-base">{form.name}</CardTitle>
-                    <Badge variant={form.status === "active" ? "default" : "secondary"}>
-                      {form.status === "active" ? "Actif" : "Brouillon"}
+          {/* Main grid: Customization + Preview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Customization */}
+            <Card>
+              <CardContent className="p-6 space-y-5">
+                <div>
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <span className="text-primary">⚙</span> Personnalisation
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adaptez le formulaire à votre marque
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label>Nom de la marque</Label>
+                    <Input
+                      value={style.brandName}
+                      onChange={(e) => setStyle({ ...style, brandName: e.target.value })}
+                      placeholder="Ma Boutique"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Couleur principale</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={style.primaryColor}
+                        onChange={(e) => setStyle({ ...style, primaryColor: e.target.value })}
+                        className="w-10 h-10 rounded border cursor-pointer"
+                      />
+                      <Input
+                        value={style.primaryColor}
+                        onChange={(e) => setStyle({ ...style, primaryColor: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>URL de redirection après commande</Label>
+                    <Input
+                      value={style.redirectUrl}
+                      onChange={(e) => setStyle({ ...style, redirectUrl: e.target.value })}
+                      placeholder="https://votresite.com/merci"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Le client sera redirigé vers cette page après avoir passé commande (idéal pour Pixel Facebook)
+                    </p>
+                  </div>
+                </div>
+
+                <Button onClick={() => saveMutation.mutate()} className="w-full" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
+                  Sauvegarder la personnalisation
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Right: Preview */}
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-base font-semibold flex items-center gap-2 mb-4">
+                  <span className="text-primary">👁</span> Aperçu du formulaire
+                </h2>
+                <div className="max-h-[500px] overflow-y-auto">
+                  <FormPreview
+                    style={style}
+                    products={products}
+                    selectedProductId={selectedProductId}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Product pre-selection */}
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <span className="text-primary">⚙</span> Produit pré-sélectionné
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Optionnel - Le client pourra toujours changer
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <div
+                  className={`p-3 rounded-lg cursor-pointer border transition-colors ${
+                    !selectedProductId
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted/50"
+                  }`}
+                  onClick={() => setSelectedProductId(null)}
+                >
+                  <span className="font-medium text-sm">Aucun (formulaire générique)</span>
+                </div>
+                {products.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`p-3 rounded-lg cursor-pointer border transition-colors flex items-center justify-between ${
+                      selectedProductId === p.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                    onClick={() => setSelectedProductId(p.id)}
+                  >
+                    <span className="font-medium text-sm">{p.name}</span>
+                    <Badge variant={selectedProductId === p.id ? "secondary" : "outline"}>
+                      {p.price.toLocaleString("fr-FR")} FCFA
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={form.status === "active"}
-                      onCheckedChange={() => handleToggleStatus(form)}
-                    />
-                    <FormBuilderDialog
-                      form={form}
-                      onSave={handleSaveForm}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          Modifier
-                        </Button>
-                      }
-                    />
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(form.id)}>
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
-                  <span><BarChart3 size={14} className="inline mr-1" />{form.submissions_count || 0} soumissions</span>
-                  <span><Check size={14} className="inline mr-1" />{form.conversions_count || 0} conversions</span>
-                  <span>Créé le {new Date(form.created_at).toLocaleDateString()}</span>
+                ))}
+                {products.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">
+                    Aucun produit actif. Ajoutez des produits dans la section Produits.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Integration code */}
+          {form && (
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <span className="text-primary">&lt;&gt;</span> Code d'intégration
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Copiez le code correspondant à votre plateforme
+                  </p>
                 </div>
 
-                <Tabs defaultValue="html" className="w-full">
-                  <TabsList className="h-8">
-                    <TabsTrigger value="html" className="text-xs px-3 h-7">HTML</TabsTrigger>
-                    <TabsTrigger value="wordpress" className="text-xs px-3 h-7">WordPress</TabsTrigger>
-                    <TabsTrigger value="elementor" className="text-xs px-3 h-7">Elementor</TabsTrigger>
-                    <TabsTrigger value="preview" className="text-xs px-3 h-7">Aperçu</TabsTrigger>
+                <Tabs defaultValue="elementor">
+                  <TabsList>
+                    <TabsTrigger value="elementor">Elementor</TabsTrigger>
+                    <TabsTrigger value="wordpress">WordPress</TabsTrigger>
+                    <TabsTrigger value="html">HTML Simple</TabsTrigger>
                   </TabsList>
 
-                  {(["html", "wordpress", "elementor"] as const).map((type) => (
-                    <TabsContent key={type} value={type}>
-                      <div className="relative">
-                        <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto max-h-40 font-mono">
-                          {generateEmbedCode(form, type)}
-                        </pre>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="absolute top-2 right-2 h-7 text-xs"
-                          onClick={() => copyCode(form, type)}
-                        >
-                          {copiedId === `${form.id}-${type}` ? (
-                            <><Check size={12} className="mr-1" /> Copié</>
-                          ) : (
-                            <><Copy size={12} className="mr-1" /> Copier</>
-                          )}
-                        </Button>
-                      </div>
-                    </TabsContent>
-                  ))}
+                  {(["elementor", "wordpress", "html"] as const).map((type) => {
+                    const instructions =
+                      type === "elementor"
+                        ? ['Ajoutez un bloc "HTML personnalisé" dans Elementor', "Collez le code ci-dessous"]
+                        : type === "wordpress"
+                        ? ['Ajoutez un bloc "HTML personnalisé"', "Collez le code ci-dessous"]
+                        : ["Copiez le code dans votre page HTML"];
 
-                  <TabsContent value="preview">
-                    <FormPreview form={form} />
-                  </TabsContent>
+                    return (
+                      <TabsContent key={type} value={type} className="space-y-3">
+                        <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-0.5">
+                          {instructions.map((instr, i) => (
+                            <li key={i}>{instr}</li>
+                          ))}
+                        </ol>
+                        <div className="relative">
+                          <pre className="bg-muted/50 rounded-lg p-4 text-xs overflow-x-auto max-h-48 font-mono whitespace-pre-wrap">
+                            {generateEmbedCode(form.id, style, selectedProduct, type)}
+                          </pre>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="absolute top-2 right-2 h-8 w-8"
+                            onClick={() => copyCode(type)}
+                          >
+                            {copiedType === type ? <Check size={14} /> : <Copy size={14} />}
+                          </Button>
+                        </div>
+                      </TabsContent>
+                    );
+                  })}
                 </Tabs>
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
       </ModuleGate>
     </DashboardLayout>
