@@ -2,23 +2,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
-const data = [
-  { day: "Lun", completed: 28, pending: 5, cancelled: 2 },
-  { day: "Mar", completed: 32, pending: 3, cancelled: 1 },
-  { day: "Mer", completed: 24, pending: 8, cancelled: 3 },
-  { day: "Jeu", completed: 35, pending: 4, cancelled: 1 },
-  { day: "Ven", completed: 42, pending: 6, cancelled: 2 },
-  { day: "Sam", completed: 48, pending: 7, cancelled: 3 },
-  { day: "Dim", completed: 18, pending: 2, cancelled: 1 },
-];
-
 const chartConfig = {
   completed: { label: "Livrées", color: "hsl(168, 80%, 45%)" },
   pending: { label: "En cours", color: "hsl(38, 95%, 55%)" },
   cancelled: { label: "Annulées", color: "hsl(0, 84%, 60%)" },
 };
 
-export function OrdersChart() {
+interface Props {
+  data: { day: string; completed: number; pending: number; cancelled: number }[];
+}
+
+export function OrdersChart({ data }: Props) {
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2">
