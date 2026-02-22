@@ -68,20 +68,25 @@ const Team = () => {
     queryKey: ["team-members", storeId],
     enabled: !!storeId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("id, user_id, role, profiles!inner(name, email, phone, avatar_url)")
-        .eq("store_id", storeId!);
-      if (error) throw error;
-      return (data || []).map((r: any) => ({
-        id: r.id,
-        user_id: r.user_id,
-        name: r.profiles?.name || "Sans nom",
-        email: r.profiles?.email || null,
-        phone: r.profiles?.phone || null,
-        role: dbToFrontRole[r.role] || "caller",
-        avatar_url: r.profiles?.avatar_url || null,
-      })) as MemberRow[];
+      const [rolesRes, profilesRes] = await Promise.all([
+        supabase.from("user_roles").select("id, user_id, role").eq("store_id", storeId!),
+        supabase.from("profiles").select("user_id, name, email, phone, avatar_url").eq("store_id", storeId!),
+      ]);
+      if (rolesRes.error) throw rolesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
+      const profileMap = new Map((profilesRes.data || []).map((p) => [p.user_id, p]));
+      return (rolesRes.data || []).map((r) => {
+        const prof = profileMap.get(r.user_id);
+        return {
+          id: r.id,
+          user_id: r.user_id,
+          name: prof?.name || "Sans nom",
+          email: prof?.email || null,
+          phone: prof?.phone || null,
+          role: dbToFrontRole[r.role] || "caller",
+          avatar_url: prof?.avatar_url || null,
+        };
+      }) as MemberRow[];
     },
   });
 
@@ -110,12 +115,21 @@ const Team = () => {
   const inviteMutation = useMutation({
     mutationFn: async (values: { email: string; role: TeamRole }) => {
       const dbRole = frontToDbRole[values.role] as any;
+      // 1. Insert invitation in DB
       const { error } = await supabase.from("team_invitations").insert({
         store_id: storeId!,
         email: values.email,
         role: dbRole,
       });
       if (error) throw error;
+      // 2. Call edge function to send the actual email
+      const { error: fnError } = await supabase.functions.invoke("send-invitation", {
+        body: { email: values.email, store_id: storeId },
+      });
+      if (fnError) {
+        console.error("send-invitation error:", fnError);
+        // Don't throw - invitation is saved, email sending is best-effort
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-invitations"] });
