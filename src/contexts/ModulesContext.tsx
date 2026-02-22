@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { FREE_MODULE_IDS, getModuleById, calculateMonthlyPrice, type ModuleDefinition } from "@/lib/modules-registry";
-
-const STORAGE_KEY = "intramate_active_modules";
+import { FREE_MODULE_IDS, getModuleById, calculateMonthlyPrice } from "@/lib/modules-registry";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ModulesContextValue {
   activeModules: string[];
@@ -11,34 +11,61 @@ interface ModulesContextValue {
   deactivateModule: (id: string) => void;
   setModules: (ids: string[]) => void;
   monthlyPrice: number;
+  isLoading: boolean;
 }
 
 const ModulesContext = createContext<ModulesContextValue | null>(null);
 
-function loadModules(): string[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as string[];
-      // Always include free modules
-      return [...new Set([...FREE_MODULE_IDS, ...parsed])];
-    }
-  } catch { /* ignore */ }
-  return [...FREE_MODULE_IDS];
-}
-
-function saveModules(ids: string[]) {
-  // Only persist non-free modules
-  const nonFree = ids.filter((id) => !FREE_MODULE_IDS.includes(id));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nonFree));
-}
-
 export function ModulesProvider({ children }: { children: ReactNode }) {
-  const [activeModules, setActiveModules] = useState<string[]>(loadModules);
+  const { user } = useAuth();
+  const storeId = user?.store_id;
+  const [paidModules, setPaidModules] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  const activeModules = [...new Set([...FREE_MODULE_IDS, ...paidModules])];
+
+  // Fetch modules from DB when store changes
   useEffect(() => {
-    saveModules(activeModules);
-  }, [activeModules]);
+    if (!storeId) {
+      setPaidModules([]);
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchModules = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("store_modules")
+        .select("module_id")
+        .eq("store_id", storeId);
+
+      if (!cancelled) {
+        if (!error && data) {
+          setPaidModules(data.map((r) => r.module_id));
+        }
+        setIsLoading(false);
+      }
+    };
+
+    fetchModules();
+
+    // Realtime subscription for cross-tab/device sync
+    const channel = supabase
+      .channel(`store_modules_${storeId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "store_modules", filter: `store_id=eq.${storeId}` },
+        () => { fetchModules(); }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [storeId]);
 
   const hasModule = useCallback(
     (id: string) => activeModules.includes(id),
@@ -55,24 +82,62 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
     [activeModules]
   );
 
-  const activateModule = useCallback((id: string) => {
-    setActiveModules((prev) => [...new Set([...prev, id])]);
-  }, []);
+  const activateModule = useCallback(
+    async (id: string) => {
+      if (!storeId || FREE_MODULE_IDS.includes(id)) return;
+      // Optimistic update
+      setPaidModules((prev) => [...new Set([...prev, id])]);
+      const { error } = await supabase
+        .from("store_modules")
+        .insert({ store_id: storeId, module_id: id });
+      if (error && !error.message.includes("duplicate")) {
+        // Revert on error
+        setPaidModules((prev) => prev.filter((m) => m !== id));
+      }
+    },
+    [storeId]
+  );
 
-  const deactivateModule = useCallback((id: string) => {
-    if (FREE_MODULE_IDS.includes(id)) return; // Can't deactivate free modules
-    setActiveModules((prev) => prev.filter((m) => m !== id));
-  }, []);
+  const deactivateModule = useCallback(
+    async (id: string) => {
+      if (!storeId || FREE_MODULE_IDS.includes(id)) return;
+      // Optimistic update
+      setPaidModules((prev) => prev.filter((m) => m !== id));
+      const { error } = await supabase
+        .from("store_modules")
+        .delete()
+        .eq("store_id", storeId)
+        .eq("module_id", id);
+      if (error) {
+        // Revert on error
+        setPaidModules((prev) => [...new Set([...prev, id])]);
+      }
+    },
+    [storeId]
+  );
 
-  const setModules = useCallback((ids: string[]) => {
-    setActiveModules([...new Set([...FREE_MODULE_IDS, ...ids])]);
-  }, []);
+  const setModules = useCallback(
+    async (ids: string[]) => {
+      if (!storeId) return;
+      const nonFree = ids.filter((id) => !FREE_MODULE_IDS.includes(id));
+      setPaidModules(nonFree);
+
+      // Delete all existing, then insert new ones
+      await supabase.from("store_modules").delete().eq("store_id", storeId);
+      if (nonFree.length > 0) {
+        await supabase
+          .from("store_modules")
+          .insert(nonFree.map((module_id) => ({ store_id: storeId, module_id })));
+      }
+    },
+    [storeId]
+  );
 
   const monthlyPrice = calculateMonthlyPrice(activeModules);
 
   return (
     <ModulesContext.Provider
-      value={{ activeModules, hasModule, isFeatureEnabled, activateModule, deactivateModule, setModules, monthlyPrice }}
+      value={{ activeModules, hasModule, isFeatureEnabled, activateModule, deactivateModule, setModules, monthlyPrice, isLoading }}
     >
       {children}
     </ModulesContext.Provider>
