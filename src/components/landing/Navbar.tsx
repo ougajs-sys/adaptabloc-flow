@@ -18,10 +18,10 @@ export const Navbar = () => {
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm font-[Space_Grotesk]">EF</span>
+            <span className="text-primary-foreground font-bold text-sm font-[Space_Grotesk]">IM</span>
           </div>
           <span className="text-xl font-bold font-[Space_Grotesk] text-foreground">
-            Easy<span className="text-primary">Flow</span>
+            Intra<span className="text-primary">mate</span>
           </span>
         </Link>
 

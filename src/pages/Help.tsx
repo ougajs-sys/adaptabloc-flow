@@ -10,7 +10,7 @@ const faqItems = [
   { q: "Comment activer un module payant ?", a: "Allez dans Modules, parcourez les modules disponibles et cliquez sur 'Activer'. Le coût mensuel sera recalculé automatiquement." },
   { q: "Comment fonctionne la facturation ?", a: "La facturation est modulaire : vous payez uniquement les modules activés. Le montant est calculé en temps réel dans la section Facturation." },
   { q: "Comment gérer mon stock ?", a: "Activez le module 'Gestion stock automatique' pour bénéficier des alertes de stock faible et de la mise à jour automatique après chaque commande." },
-  { q: "Comment contacter le support ?", a: "Envoyez-nous un email à support@easyflow.app ou contactez-nous via WhatsApp au +225 07 00 00 00." },
+  { q: "Comment contacter le support ?", a: "Envoyez-nous un email à support@intramate.app ou contactez-nous via WhatsApp au +225 07 00 00 00." },
 ];
 
 const Help = () => {
@@ -74,7 +74,7 @@ const Help = () => {
             <CardDescription>Notre équipe est là pour vous aider.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button variant="outline" className="gap-2" onClick={() => window.open("mailto:support@easyflow.app")}>
+            <Button variant="outline" className="gap-2" onClick={() => window.open("mailto:support@intramate.app")}>
               <Mail size={16} /> Email
             </Button>
             <Button variant="outline" className="gap-2" onClick={() => window.open("https://wa.me/22507000000")}>

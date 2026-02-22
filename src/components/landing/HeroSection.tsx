@@ -75,7 +75,7 @@ export const HeroSection = () => {
               <div className="w-3 h-3 rounded-full bg-destructive/60" />
               <div className="w-3 h-3 rounded-full bg-[hsl(38,95%,55%)]/60" />
               <div className="w-3 h-3 rounded-full bg-accent/60" />
-              <span className="ml-3 text-xs text-muted-foreground">dashboard.easyflow.app</span>
+              <span className="ml-3 text-xs text-muted-foreground">dashboard.intramate.app</span>
             </div>
             <div className="p-6 sm:p-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[

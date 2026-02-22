@@ -17,7 +17,7 @@ export const OnboardingStepInfo = ({ data, updateData, onNext, onBack }: Props) 
     <div>
       <h2 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-2">Vos informations</h2>
       <p className="text-muted-foreground mb-8">
-        Quelques détails pour créer votre espace EasyFlow.
+        Quelques détails pour créer votre espace Intramate.
       </p>
 
       <div className="space-y-5">

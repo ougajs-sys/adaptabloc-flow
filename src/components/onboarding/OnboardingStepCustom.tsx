@@ -231,7 +231,7 @@ export const OnboardingStepCustom = ({ data, updateData, onNext, onBack }: Props
           <Sparkles size={32} className="text-primary animate-pulse" />
         </div>
         <h2 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-3">
-          EasyFlow analyse votre activité...
+          Intramate analyse votre activité...
         </h2>
         <p className="text-muted-foreground mb-6 max-w-md">
           Notre intelligence embarquée prépare une configuration sur mesure pour vous.

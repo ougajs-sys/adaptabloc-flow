@@ -37,7 +37,7 @@ export const OnboardingStepLaunch = ({ data }: Props) => {
         🎉 Bienvenue, {data.businessName} !
       </h2>
       <p className="text-muted-foreground mb-8">
-        Votre espace EasyFlow est prêt. Voici un résumé de votre configuration :
+        Votre espace Intramate est prêt. Voici un résumé de votre configuration :
       </p>
 
       <div className="bg-card border border-border rounded-xl p-6 text-left max-w-md mx-auto mb-8">

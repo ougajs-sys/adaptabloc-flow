@@ -142,7 +142,7 @@ export function DashboardSidebar() {
           <Zap size={18} className="text-primary-foreground" />
         </div>
         <span className="font-[Space_Grotesk] font-bold text-lg text-sidebar-foreground">
-          EasyFlow
+          Intramate
         </span>
       </div>
 

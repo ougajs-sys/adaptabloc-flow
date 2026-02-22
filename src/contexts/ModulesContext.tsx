@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { FREE_MODULE_IDS, getModuleById, calculateMonthlyPrice, type ModuleDefinition } from "@/lib/modules-registry";
 
-const STORAGE_KEY = "easyflow_active_modules";
+const STORAGE_KEY = "intramate_active_modules";
 
 interface ModulesContextValue {
   activeModules: string[];
