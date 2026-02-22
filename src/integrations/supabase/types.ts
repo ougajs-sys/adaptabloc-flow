@@ -605,6 +605,35 @@ export type Database = {
           },
         ]
       }
+      store_modules: {
+        Row: {
+          activated_at: string
+          id: string
+          module_id: string
+          store_id: string
+        }
+        Insert: {
+          activated_at?: string
+          id?: string
+          module_id: string
+          store_id: string
+        }
+        Update: {
+          activated_at?: string
+          id?: string
+          module_id?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_modules_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null
