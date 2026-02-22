@@ -25,6 +25,7 @@ import Statistics from "./pages/Statistics";
 import Help from "./pages/Help";
 import Campaigns from "./pages/Campaigns";
 import EmbedForms from "./pages/EmbedForms";
+import EmbedOrder from "./pages/EmbedOrder";
 import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/workspace/caller" element={<ProtectedRoute><CallerWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute><PreparateurWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
+    <Route path="/embed/order" element={<EmbedOrder />} />
     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
     <Route path="*" element={<NotFound />} />
   </Routes>
