@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,11 +12,19 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Plus, Package, AlertTriangle } from "lucide-react";
+import { Search, Plus, Package, AlertTriangle, Loader2 } from "lucide-react";
 import { NewProductDialog, type NewProductFormValues } from "@/components/products/NewProductDialog";
 import { EditProductDialog, type EditProductFormValues } from "@/components/products/EditProductDialog";
 import { ProductDetailDialog } from "@/components/products/ProductDetailDialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface ProductVariant {
+  id?: string;
+  label: string;
+  stock: number;
+}
 
 interface Product {
   id: string;
@@ -25,22 +33,11 @@ interface Product {
   price: number;
   stock: number;
   maxStock: number;
-  variants: { label: string; stock: number }[];
+  variants: ProductVariant[];
   image: string;
   status: "active" | "draft" | "out_of_stock";
   sales: number;
 }
-
-const mockProducts: Product[] = [
-  { id: "PRD-001", name: "Sneakers Urban Pro", category: "Chaussures", price: 25000, stock: 45, maxStock: 100, variants: [{ label: "40 - Noir", stock: 12 }, { label: "41 - Noir", stock: 8 }, { label: "42 - Noir", stock: 15 }, { label: "42 - Blanc", stock: 10 }], image: "👟", status: "active", sales: 156 },
-  { id: "PRD-002", name: "T-Shirt Classic Fit", category: "Vêtements", price: 10000, stock: 230, maxStock: 300, variants: [{ label: "S - Blanc", stock: 40 }, { label: "M - Blanc", stock: 60 }, { label: "L - Blanc", stock: 50 }, { label: "M - Noir", stock: 80 }], image: "👕", status: "active", sales: 132 },
-  { id: "PRD-003", name: "Sac Bandoulière Cuir", category: "Accessoires", price: 28500, stock: 18, maxStock: 50, variants: [{ label: "Marron", stock: 10 }, { label: "Noir", stock: 8 }], image: "👜", status: "active", sales: 98 },
-  { id: "PRD-004", name: "Robe Été Fleurie", category: "Vêtements", price: 18000, stock: 5, maxStock: 80, variants: [{ label: "S", stock: 1 }, { label: "M", stock: 2 }, { label: "L", stock: 2 }], image: "👗", status: "active", sales: 74 },
-  { id: "PRD-005", name: "Casquette Sport", category: "Accessoires", price: 8000, stock: 120, maxStock: 200, variants: [{ label: "Taille unique - Noir", stock: 60 }, { label: "Taille unique - Blanc", stock: 60 }], image: "🧢", status: "active", sales: 87 },
-  { id: "PRD-006", name: "Montre Sport Digitale", category: "Accessoires", price: 22000, stock: 0, maxStock: 40, variants: [{ label: "Noir", stock: 0 }, { label: "Bleu", stock: 0 }], image: "⌚", status: "out_of_stock", sales: 45 },
-  { id: "PRD-007", name: "Ensemble Jogging Premium", category: "Vêtements", price: 35000, stock: 32, maxStock: 60, variants: [{ label: "M - Gris", stock: 12 }, { label: "L - Gris", stock: 10 }, { label: "XL - Noir", stock: 10 }], image: "🏃", status: "active", sales: 63 },
-  { id: "PRD-008", name: "Sandales Dorées", category: "Chaussures", price: 15000, stock: 28, maxStock: 70, variants: [{ label: "37", stock: 8 }, { label: "38", stock: 10 }, { label: "39", stock: 10 }], image: "👡", status: "active", sales: 52 },
-];
 
 const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   active: { label: "Actif", variant: "default" },
@@ -48,10 +45,12 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   out_of_stock: { label: "Rupture", variant: "destructive" },
 };
 
-let productCounter = mockProducts.length + 1;
-
 const Products = () => {
-  const [products, setProducts] = useState(mockProducts);
+  const { user } = useAuth();
+  const storeId = user?.store_id;
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [newProductOpen, setNewProductOpen] = useState(false);
@@ -59,34 +58,140 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
 
-  const handleNewProduct = (values: NewProductFormValues) => {
-    const id = `PRD-${String(productCounter++).padStart(3, "0")}`;
+  const fetchProducts = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+    const { data: prods, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    // Fetch variants for all products
+    const productIds = (prods || []).map((p) => p.id);
+    const { data: variants } = productIds.length > 0
+      ? await supabase.from("product_variants").select("*").in("product_id", productIds)
+      : { data: [] };
+
+    const variantMap = new Map<string, ProductVariant[]>();
+    (variants || []).forEach((v) => {
+      const list = variantMap.get(v.product_id) || [];
+      list.push({ id: v.id, label: v.name, stock: v.stock ?? 0 });
+      variantMap.set(v.product_id, list);
+    });
+
+    const mapped: Product[] = (prods || []).map((p) => {
+      const pvs = variantMap.get(p.id) || [];
+      const totalStock = pvs.length > 0 ? pvs.reduce((s, v) => s + v.stock, 0) : (p.stock ?? 0);
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.category || "Autre",
+        price: p.price,
+        stock: totalStock,
+        maxStock: p.stock_alert_threshold ? Math.max(totalStock, p.stock_alert_threshold * 10) : Math.max(totalStock, 100),
+        variants: pvs,
+        image: p.image_url || "📦",
+        status: !p.is_active ? "draft" : totalStock === 0 ? "out_of_stock" : "active",
+        sales: 0, // computed from order_items later
+      };
+    });
+
+    setProducts(mapped);
+    setLoading(false);
+  }, [storeId]);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  const handleNewProduct = async (values: NewProductFormValues) => {
+    if (!storeId) return;
     const totalStock = values.variants.reduce((s, v) => s + (v.stock ?? 0), 0);
-    setProducts((prev) => [{
-      id, name: values.name, category: values.category, price: values.price,
-      stock: totalStock, maxStock: values.maxStock,
-      variants: values.variants.map((v) => ({ label: v.label ?? "", stock: v.stock ?? 0 })),
-      image: values.image, status: values.status as Product["status"], sales: 0,
-    }, ...prev]);
+    const { data: newProd, error } = await supabase
+      .from("products")
+      .insert({
+        store_id: storeId,
+        name: values.name,
+        category: values.category,
+        price: values.price,
+        stock: totalStock,
+        image_url: values.image,
+        is_active: values.status === "active",
+        stock_alert_threshold: Math.round(values.maxStock * 0.15),
+      })
+      .select()
+      .single();
+
+    if (error || !newProd) {
+      toast({ title: "Erreur", description: error?.message, variant: "destructive" });
+      return;
+    }
+
+    // Insert variants
+    if (values.variants.length > 0) {
+      await supabase.from("product_variants").insert(
+        values.variants.map((v) => ({
+          product_id: newProd.id,
+          name: v.label ?? "",
+          stock: v.stock ?? 0,
+        }))
+      );
+    }
+
+    toast({ title: "Produit ajouté" });
+    fetchProducts();
   };
 
-  const handleEditProduct = (values: EditProductFormValues) => {
-    if (!editingProduct) return;
+  const handleEditProduct = async (values: EditProductFormValues) => {
+    if (!editingProduct || !storeId) return;
     const totalStock = values.variants.reduce((s, v) => s + (v.stock ?? 0), 0);
-    setProducts((prev) => prev.map((p) => p.id === editingProduct.id ? {
-      ...p, name: values.name, category: values.category, price: values.price,
-      stock: totalStock, maxStock: values.maxStock, image: values.image,
-      status: values.status as Product["status"],
-      variants: values.variants.map((v) => ({ label: v.label, stock: v.stock })),
-    } : p));
+
+    await supabase
+      .from("products")
+      .update({
+        name: values.name,
+        category: values.category,
+        price: values.price,
+        stock: totalStock,
+        image_url: values.image,
+        is_active: values.status !== "draft",
+        stock_alert_threshold: Math.round(values.maxStock * 0.15),
+      })
+      .eq("id", editingProduct.id);
+
+    // Replace variants: delete old, insert new
+    await supabase.from("product_variants").delete().eq("product_id", editingProduct.id);
+    if (values.variants.length > 0) {
+      await supabase.from("product_variants").insert(
+        values.variants.map((v) => ({
+          product_id: editingProduct.id,
+          name: v.label,
+          stock: v.stock,
+        }))
+      );
+    }
+
     toast({ title: "Produit modifié" });
+    setEditingProduct(null);
+    fetchProducts();
   };
 
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (!deletingProduct) return;
-    setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
+    await supabase.from("product_variants").delete().eq("product_id", deletingProduct.id);
+    const { error } = await supabase.from("products").delete().eq("id", deletingProduct.id);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Produit supprimé" });
+    }
     setDeletingProduct(null);
-    toast({ title: "Produit supprimé" });
+    fetchProducts();
   };
 
   const categories = [...new Set(products.map((p) => p.category))];
@@ -98,6 +203,16 @@ const Products = () => {
 
   const lowStock = products.filter((p) => p.stock > 0 && p.stock <= p.maxStock * 0.15).length;
   const outOfStock = products.filter((p) => p.stock === 0).length;
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Produits">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>
@@ -156,39 +271,47 @@ const Products = () => {
           </SelectContent>
         </Select>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((product) => {
-          const stockPercent = Math.round((product.stock / product.maxStock) * 100);
-          const isLow = stockPercent > 0 && stockPercent <= 15;
-          const st = statusLabels[product.status];
-          return (
-            <Card key={product.id} className="border-border/60 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedProduct(product)}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center text-2xl">{product.image}</div>
-                  <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm text-card-foreground leading-tight">{product.name}</h3>
-                  <p className="text-xs text-muted-foreground">{product.category} · {product.id}</p>
-                </div>
-                <p className="text-lg font-bold font-[Space_Grotesk] text-card-foreground">{product.price.toLocaleString("fr-FR")} F</p>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className={isLow ? "text-destructive font-medium" : "text-muted-foreground"}>Stock : {product.stock}/{product.maxStock}</span>
-                    <span className="text-muted-foreground">{product.sales} ventes</span>
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <Package size={48} className="mx-auto mb-3 opacity-30" />
+          <p>Aucun produit trouvé</p>
+          <p className="text-sm">Ajoutez votre premier produit pour commencer.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((product) => {
+            const stockPercent = product.maxStock > 0 ? Math.round((product.stock / product.maxStock) * 100) : 0;
+            const isLow = stockPercent > 0 && stockPercent <= 15;
+            const st = statusLabels[product.status];
+            return (
+              <Card key={product.id} className="border-border/60 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedProduct(product)}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center text-2xl">{product.image}</div>
+                    <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
                   </div>
-                  <Progress value={stockPercent} className={`h-1.5 ${isLow ? "[&>div]:bg-destructive" : ""}`} />
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {product.variants.slice(0, 3).map((v) => <span key={v.label} className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5">{v.label}</span>)}
-                  {product.variants.length > 3 && <span className="text-xs text-muted-foreground">+{product.variants.length - 3}</span>}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                  <div>
+                    <h3 className="font-medium text-sm text-card-foreground leading-tight">{product.name}</h3>
+                    <p className="text-xs text-muted-foreground">{product.category}</p>
+                  </div>
+                  <p className="text-lg font-bold font-[Space_Grotesk] text-card-foreground">{product.price.toLocaleString("fr-FR")} F</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className={isLow ? "text-destructive font-medium" : "text-muted-foreground"}>Stock : {product.stock}/{product.maxStock}</span>
+                      <span className="text-muted-foreground">{product.sales} ventes</span>
+                    </div>
+                    <Progress value={stockPercent} className={`h-1.5 ${isLow ? "[&>div]:bg-destructive" : ""}`} />
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {product.variants.slice(0, 3).map((v) => <span key={v.label} className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5">{v.label}</span>)}
+                    {product.variants.length > 3 && <span className="text-xs text-muted-foreground">+{product.variants.length - 3}</span>}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </DashboardLayout>
     </>
   );

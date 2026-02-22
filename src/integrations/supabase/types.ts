@@ -704,9 +704,11 @@ export type Database = {
       invoice_status: "draft" | "sent" | "paid" | "overdue" | "cancelled"
       order_status:
         | "new"
+        | "caller_pending"
         | "confirmed"
         | "preparing"
         | "ready"
+        | "in_transit"
         | "shipping"
         | "delivered"
         | "returned"
@@ -853,9 +855,11 @@ export const Constants = {
       invoice_status: ["draft", "sent", "paid", "overdue", "cancelled"],
       order_status: [
         "new",
+        "caller_pending",
         "confirmed",
         "preparing",
         "ready",
+        "in_transit",
         "shipping",
         "delivered",
         "returned",
