@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,19 +17,29 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Plus, Eye, Package, MapPin, Phone, LayoutGrid, List, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Eye, Package, MapPin, Phone, LayoutGrid, List, Pencil, Trash2, Loader2 } from "lucide-react";
 import { OrderPipeline, type PipelineOrder } from "@/components/orders/OrderPipeline";
 import { getStageByStatus, pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
 import { NewOrderDialog, type NewOrderFormValues } from "@/components/orders/NewOrderDialog";
 import { EditOrderDialog, type EditOrderFormValues } from "@/components/orders/EditOrderDialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface OrderItem {
+  name: string;
+  qty: number;
+  price: number;
+  variant?: string;
+}
 
 interface Order {
   id: string;
+  dbId: string; // uuid from DB
   customer: string;
   phone: string;
   email: string;
-  items: { name: string; qty: number; price: number; variant?: string }[];
+  items: OrderItem[];
   total: number;
   status: OrderPipelineStatus;
   paymentStatus: string;
@@ -38,86 +48,28 @@ interface Order {
   assignee?: string;
 }
 
-const initialOrders: Order[] = [
-  {
-    id: "CMD-1247", customer: "Aminata Diallo", phone: "+225 07 12 34 56", email: "aminata@mail.com",
-    items: [
-      { name: "Sneakers Urban Pro", qty: 1, price: 25000, variant: "Taille 42 - Noir" },
-      { name: "T-Shirt Classic Fit", qty: 2, price: 10000, variant: "Taille M - Blanc" },
-    ],
-    total: 45000, status: "delivered", paymentStatus: "paid", date: "2026-02-13T14:30:00",
-    address: "Cocody, Rue des Jardins, Abidjan", assignee: "Koné Mamadou",
-  },
-  {
-    id: "CMD-1246", customer: "Moussa Koné", phone: "+225 05 98 76 54", email: "moussa.k@mail.com",
-    items: [{ name: "Sac Bandoulière Cuir", qty: 1, price: 28500, variant: "Marron" }],
-    total: 28500, status: "in_transit", paymentStatus: "paid", date: "2026-02-13T12:15:00",
-    address: "Plateau, Av. Terrasson, Abidjan", assignee: "Traoré Issa",
-  },
-  {
-    id: "CMD-1245", customer: "Fatou Sow", phone: "+225 01 23 45 67", email: "fatou.s@mail.com",
-    items: [
-      { name: "Robe Été Fleurie", qty: 1, price: 18000, variant: "Taille S" },
-      { name: "Sandales Dorées", qty: 1, price: 15000, variant: "Pointure 38" },
-      { name: "Bracelet Perles", qty: 3, price: 2000 },
-      { name: "Lunettes Soleil", qty: 1, price: 12000 },
-      { name: "Foulard Soie", qty: 1, price: 16000 },
-    ],
-    total: 67000, status: "preparing", paymentStatus: "paid", date: "2026-02-13T10:45:00",
-    address: "Marcory, Zone 4, Abidjan", assignee: "Sow Mariama",
-  },
-  {
-    id: "CMD-1244", customer: "Ibrahim Traoré", phone: "+225 07 65 43 21", email: "ibrahim.t@mail.com",
-    items: [{ name: "Casquette Sport", qty: 1, price: 15000 }],
-    total: 15000, status: "delivered", paymentStatus: "paid", date: "2026-02-12T16:00:00",
-    address: "Yopougon, Quartier Millionnaire, Abidjan", assignee: "Bamba Ali",
-  },
-  {
-    id: "CMD-1243", customer: "Aïcha Bamba", phone: "+225 05 11 22 33", email: "aicha.b@mail.com",
-    items: [
-      { name: "Sneakers Urban Pro", qty: 2, price: 25000, variant: "Taille 39 - Blanc" },
-      { name: "Sac à Dos Premium", qty: 1, price: 35000 },
-      { name: "Montre Sport", qty: 1, price: 22000 },
-    ],
-    total: 107000, status: "cancelled", paymentStatus: "refunded", date: "2026-02-12T09:30:00",
-    address: "Riviera 3, Abidjan",
-  },
-  {
-    id: "CMD-1242", customer: "Oumar Cissé", phone: "+225 01 44 55 66", email: "oumar.c@mail.com",
-    items: [
-      { name: "Polo Premium", qty: 1, price: 18500, variant: "Taille L - Bleu" },
-      { name: "Ceinture Cuir", qty: 1, price: 15000 },
-    ],
-    total: 33500, status: "confirmed", paymentStatus: "paid", date: "2026-02-12T08:00:00",
-    address: "Treichville, Av. 12, Abidjan",
-  },
-  {
-    id: "CMD-1241", customer: "Mariam Touré", phone: "+225 07 77 88 99", email: "mariam.t@mail.com",
-    items: [{ name: "Ensemble Sport Femme", qty: 1, price: 32000, variant: "Taille M - Rose" }],
-    total: 32000, status: "new", paymentStatus: "pending", date: "2026-02-11T18:20:00",
-    address: "Abobo, Rond-point, Abidjan",
-  },
-  {
-    id: "CMD-1240", customer: "Sékou Diarra", phone: "+225 05 00 11 22", email: "sekou.d@mail.com",
-    items: [
-      { name: "Chemise Lin", qty: 2, price: 22000, variant: "Taille XL - Beige" },
-      { name: "Pantalon Chino", qty: 1, price: 18000, variant: "Taille 44 - Kaki" },
-    ],
-    total: 62000, status: "caller_pending", paymentStatus: "paid", date: "2026-02-11T15:10:00",
-    address: "Bingerville, Résidence Palm, Abidjan", assignee: "Diallo Fatoumata",
-  },
-];
-
 const paymentConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   paid: { label: "Payé", variant: "default" },
   pending: { label: "En attente", variant: "outline" },
   refunded: { label: "Remboursé", variant: "destructive" },
 };
 
-let orderCounter = initialOrders.length + 1;
+// Map DB order_status to frontend OrderPipelineStatus
+function mapDbStatus(dbStatus: string): OrderPipelineStatus {
+  if (dbStatus === "shipping") return "in_transit";
+  return dbStatus as OrderPipelineStatus;
+}
+function mapToDbStatus(frontStatus: OrderPipelineStatus): string {
+  if (frontStatus === "in_transit") return "shipping";
+  return frontStatus;
+}
 
 const Orders = () => {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const { user } = useAuth();
+  const storeId = user?.store_id;
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -126,43 +78,153 @@ const Orders = () => {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
 
-  const handleNewOrder = (values: NewOrderFormValues) => {
-    const id = `CMD-${1240 + orderCounter++}`;
-    const newOrder: Order = {
-      id,
-      customer: values.customer,
-      phone: values.phone,
-      email: values.email,
-      items: values.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, variant: i.variant || undefined })),
-      total: values.items.reduce((s, i) => s + i.qty * i.price, 0),
-      status: "new",
-      paymentStatus: values.paymentStatus,
-      date: new Date().toISOString(),
-      address: values.address,
-    };
-    setOrders((prev) => [newOrder, ...prev]);
+  const fetchOrders = useCallback(async () => {
+    if (!storeId) return;
+    setLoading(true);
+
+    const { data: dbOrders, error } = await supabase
+      .from("orders")
+      .select("*, customers(name, phone, email), order_items(*)")
+      .eq("store_id", storeId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    const mapped: Order[] = (dbOrders || []).map((o) => {
+      const items: OrderItem[] = (o.order_items || []).map((oi: any) => ({
+        name: oi.product_name,
+        qty: oi.quantity,
+        price: oi.unit_price,
+        variant: undefined,
+      }));
+      return {
+        id: o.order_number,
+        dbId: o.id,
+        customer: (o.customers as any)?.name || "Client inconnu",
+        phone: (o.customers as any)?.phone || "",
+        email: (o.customers as any)?.email || "",
+        items,
+        total: o.total_amount,
+        status: mapDbStatus(o.status),
+        paymentStatus: "pending", // TODO: add payment_status column
+        date: o.created_at,
+        address: o.shipping_address || "",
+        assignee: undefined,
+      };
+    });
+
+    setOrders(mapped);
+    setLoading(false);
+  }, [storeId]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const handleNewOrder = async (values: NewOrderFormValues) => {
+    if (!storeId) return;
+
+    // Generate order number
+    const orderNumber = `CMD-${Date.now().toString().slice(-6)}`;
+    const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
+
+    // Find or create customer
+    let customerId: string | null = null;
+    if (values.customer && values.phone) {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("store_id", storeId)
+        .eq("phone", values.phone)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        customerId = existing[0].id;
+      } else {
+        const { data: newCust } = await supabase
+          .from("customers")
+          .insert({ store_id: storeId, name: values.customer, phone: values.phone, email: values.email || null })
+          .select("id")
+          .single();
+        customerId = newCust?.id || null;
+      }
+    }
+
+    const { data: newOrder, error } = await supabase
+      .from("orders")
+      .insert({
+        store_id: storeId,
+        order_number: orderNumber,
+        customer_id: customerId,
+        total_amount: totalAmount,
+        shipping_address: values.address,
+        status: "new",
+        created_by: user?.id,
+      })
+      .select()
+      .single();
+
+    if (error || !newOrder) {
+      toast({ title: "Erreur", description: error?.message, variant: "destructive" });
+      return;
+    }
+
+    // Insert order items
+    if (values.items.length > 0) {
+      await supabase.from("order_items").insert(
+        values.items.map((i) => ({
+          order_id: newOrder.id,
+          product_name: i.name,
+          quantity: i.qty,
+          unit_price: i.price,
+          total_price: i.qty * i.price,
+        }))
+      );
+    }
+
+    toast({ title: "Commande créée" });
+    fetchOrders();
   };
 
-  const handleEditOrder = (values: EditOrderFormValues) => {
+  const handleEditOrder = async (values: EditOrderFormValues) => {
     if (!editingOrder) return;
-    setOrders((prev) => prev.map((o) => o.id === editingOrder.id ? {
-      ...o,
-      customer: values.customer,
-      phone: values.phone,
-      email: values.email,
-      address: values.address,
-      paymentStatus: values.paymentStatus,
-      items: values.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, variant: i.variant || undefined })),
-      total: values.items.reduce((s, i) => s + i.qty * i.price, 0),
-    } : o));
+    const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
+
+    await supabase.from("orders").update({
+      shipping_address: values.address,
+      total_amount: totalAmount,
+    }).eq("id", editingOrder.dbId);
+
+    // Replace order items
+    await supabase.from("order_items").delete().eq("order_id", editingOrder.dbId);
+    await supabase.from("order_items").insert(
+      values.items.map((i) => ({
+        order_id: editingOrder.dbId,
+        product_name: i.name,
+        quantity: i.qty,
+        unit_price: i.price,
+        total_price: i.qty * i.price,
+      }))
+    );
+
     toast({ title: "Commande modifiée" });
+    setEditingOrder(null);
+    fetchOrders();
   };
 
-  const handleDeleteOrder = () => {
+  const handleDeleteOrder = async () => {
     if (!deletingOrder) return;
-    setOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id));
+    await supabase.from("order_items").delete().eq("order_id", deletingOrder.dbId);
+    const { error } = await supabase.from("orders").delete().eq("id", deletingOrder.dbId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Commande supprimée" });
+    }
     setDeletingOrder(null);
-    toast({ title: "Commande supprimée" });
+    fetchOrders();
   };
 
   const filtered = orders.filter((o) => {
@@ -171,13 +233,20 @@ const Orders = () => {
     return matchSearch && matchStatus;
   });
 
-  const handleAdvance = useCallback((orderId: string, nextStatus: OrderPipelineStatus) => {
+  const handleAdvance = useCallback(async (orderId: string, nextStatus: OrderPipelineStatus) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    const dbStatus = mapToDbStatus(nextStatus);
+    await supabase.from("orders").update({ status: dbStatus as any }).eq("id", order.dbId);
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)));
-  }, []);
+  }, [orders]);
 
-  const handleCancel = useCallback((orderId: string) => {
+  const handleCancel = useCallback(async (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    await supabase.from("orders").update({ status: "cancelled" as any }).eq("id", order.dbId);
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o)));
-  }, []);
+  }, [orders]);
 
   const pipelineOrders: PipelineOrder[] = filtered.map((o) => ({
     id: o.id, customer: o.customer, phone: o.phone, address: o.address,
@@ -188,6 +257,16 @@ const Orders = () => {
   const inProgress = orders.filter((o) => ["caller_pending", "confirmed", "preparing", "ready", "in_transit"].includes(o.status)).length;
   const delivered = orders.filter((o) => o.status === "delivered").length;
   const cancelled = orders.filter((o) => o.status === "cancelled").length;
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Commandes">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>
@@ -231,7 +310,6 @@ const Orders = () => {
         </div>
       }
     >
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total", value: total, color: "text-foreground" },
@@ -248,7 +326,6 @@ const Orders = () => {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -284,7 +361,7 @@ const Orders = () => {
               <TableBody>
                 {filtered.map((order) => {
                   const stage = getStageByStatus(order.status);
-                  const payment = paymentConfig[order.paymentStatus];
+                  const payment = paymentConfig[order.paymentStatus] || paymentConfig.pending;
                   return (
                     <TableRow key={order.id}>
                       <TableCell className="font-mono text-xs font-medium">{order.id}</TableCell>
@@ -326,7 +403,7 @@ const Orders = () => {
               <div className="space-y-4">
                 <div className="flex gap-2">
                   <Badge variant="outline" className={`${getStageByStatus(selectedOrder.status).color} border-0`}>{getStageByStatus(selectedOrder.status).label}</Badge>
-                  <Badge variant={paymentConfig[selectedOrder.paymentStatus].variant}>{paymentConfig[selectedOrder.paymentStatus].label}</Badge>
+                  <Badge variant={(paymentConfig[selectedOrder.paymentStatus] || paymentConfig.pending).variant}>{(paymentConfig[selectedOrder.paymentStatus] || paymentConfig.pending).label}</Badge>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground"><Phone size={14} /><span>{selectedOrder.customer} — {selectedOrder.phone}</span></div>
