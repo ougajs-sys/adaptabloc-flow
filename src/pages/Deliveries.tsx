@@ -2,18 +2,24 @@ import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Truck, Clock, CheckCircle2, XCircle, MapPin, PackageCheck } from "lucide-react";
+import { Search, Truck, Clock, CheckCircle2, XCircle, MapPin, PackageCheck, Plus, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Truck }> = {
   delivered: { label: "Livré", variant: "default", icon: CheckCircle2 },
@@ -30,6 +36,12 @@ const Deliveries = () => {
   const storeId = user?.store_id;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignDeliveryId, setAssignDeliveryId] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState("");
 
   // Fetch deliveries with order + customer info
   const { data: deliveries = [] } = useQuery({
@@ -38,7 +50,7 @@ const Deliveries = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("deliveries")
-        .select("*, orders!inner(order_number, customers(name, phone, address, city))")
+        .select("*, orders!inner(order_number, customers(name, phone, address, city), shipping_address, shipping_city)")
         .eq("store_id", storeId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -46,9 +58,23 @@ const Deliveries = () => {
     },
   });
 
-  // Fetch driver profiles
-  const { data: drivers = [] } = useQuery({
-    queryKey: ["drivers", storeId],
+  // Fetch driver profiles (only users with driver role)
+  const { data: driverRoles = [] } = useQuery({
+    queryKey: ["driver-roles", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("store_id", storeId!)
+        .eq("role", "driver");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: allProfiles = [] } = useQuery({
+    queryKey: ["profiles", storeId],
     enabled: !!storeId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -58,6 +84,73 @@ const Deliveries = () => {
       if (error) throw error;
       return data || [];
     },
+  });
+
+  const drivers = allProfiles.filter((p) =>
+    driverRoles.some((r) => r.user_id === p.user_id)
+  );
+
+  // Fetch orders ready for delivery (status = ready, confirmed, preparing) that don't have a delivery yet
+  const existingDeliveryOrderIds = deliveries.map((d: any) => d.order_id);
+  const { data: eligibleOrders = [] } = useQuery({
+    queryKey: ["eligible-orders-for-delivery", storeId, existingDeliveryOrderIds],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_number, total_amount, shipping_address, shipping_city, customers(name)")
+        .eq("store_id", storeId!)
+        .in("status", ["ready", "confirmed", "preparing"])
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      // Filter out orders that already have a delivery
+      return (data || []).filter((o: any) => !existingDeliveryOrderIds.includes(o.id));
+    },
+  });
+
+  // Create delivery mutation
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const order = eligibleOrders.find((o: any) => o.id === selectedOrderId);
+      if (!order) throw new Error("Commande introuvable");
+      const { error } = await supabase.from("deliveries").insert({
+        store_id: storeId!,
+        order_id: selectedOrderId,
+        delivery_address: (order as any).shipping_address || "",
+        delivery_city: (order as any).shipping_city || "",
+        delivery_fee: parseInt(deliveryFee) || 0,
+        status: "pending",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["eligible-orders-for-delivery"] });
+      setCreateOpen(false);
+      setSelectedOrderId("");
+      setDeliveryFee("");
+      toast({ title: "Livraison créée", description: "La livraison a été ajoutée avec succès." });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Assign driver mutation
+  const assignMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("deliveries")
+        .update({ driver_id: selectedDriverId, status: "assigned" })
+        .eq("id", assignDeliveryId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      setAssignOpen(false);
+      setAssignDeliveryId("");
+      setSelectedDriverId("");
+      toast({ title: "Livreur assigné", description: "Le livreur a été assigné à la livraison." });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   // Realtime subscription
@@ -74,7 +167,7 @@ const Deliveries = () => {
 
   const getDriverName = (driverId: string | null) => {
     if (!driverId) return null;
-    return drivers.find((d) => d.user_id === driverId);
+    return allProfiles.find((d) => d.user_id === driverId);
   };
 
   const filtered = deliveries.filter((d: any) => {
@@ -97,8 +190,97 @@ const Deliveries = () => {
   const totalDone = deliveries.filter((d: any) => ["delivered", "failed"].includes(d.status)).length;
   const successRate = totalDone > 0 ? Math.round((deliveries.filter((d: any) => d.status === "delivered").length / totalDone) * 100) : 0;
 
+  const openAssign = (deliveryId: string, currentDriverId: string | null) => {
+    setAssignDeliveryId(deliveryId);
+    setSelectedDriverId(currentDriverId || "");
+    setAssignOpen(true);
+  };
+
   return (
-    <DashboardLayout title="Livraisons">
+    <DashboardLayout
+      title="Livraisons"
+      actions={
+        <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Plus size={16} /> Nouvelle livraison
+        </Button>
+      }
+    >
+      {/* Create delivery dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-[Space_Grotesk] flex items-center gap-2">
+              <Truck size={18} /> Créer une livraison
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Commande à livrer</Label>
+              {eligibleOrders.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Aucune commande prête pour livraison.</p>
+              ) : (
+                <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner une commande" /></SelectTrigger>
+                  <SelectContent>
+                    {eligibleOrders.map((o: any) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.order_number} — {o.customers?.name || "Client inconnu"} ({o.total_amount?.toLocaleString("fr-FR")} F)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Frais de livraison (FCFA)</Label>
+              <Input type="number" placeholder="0" value={deliveryFee} onChange={(e) => setDeliveryFee(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
+            <Button onClick={() => createMutation.mutate()} disabled={!selectedOrderId || createMutation.isPending} className="gap-2">
+              <Truck size={14} /> Créer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign driver dialog */}
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-[Space_Grotesk] flex items-center gap-2">
+              <UserPlus size={18} /> Assigner un livreur
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {drivers.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Aucun livreur dans votre équipe.</p>
+            ) : (
+              <div className="space-y-2">
+                <Label>Livreur</Label>
+                <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un livreur" /></SelectTrigger>
+                  <SelectContent>
+                    {drivers.map((d) => (
+                      <SelectItem key={d.user_id} value={d.user_id}>
+                        {d.name} {d.phone ? `(${d.phone})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignOpen(false)}>Annuler</Button>
+            <Button onClick={() => assignMutation.mutate()} disabled={!selectedDriverId || assignMutation.isPending} className="gap-2">
+              <UserPlus size={14} /> Assigner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -151,12 +333,13 @@ const Deliveries = () => {
                 <TableHead>Livreur</TableHead>
                 <TableHead>Frais</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     Aucune livraison trouvée
                   </TableCell>
                 </TableRow>
@@ -207,6 +390,13 @@ const Deliveries = () => {
                         <StatusIcon size={12} />
                         {st.label}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {["pending", "assigned"].includes(delivery.status) && (
+                        <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => openAssign(delivery.id, delivery.driver_id)}>
+                          <UserPlus size={12} /> {delivery.driver_id ? "Réassigner" : "Assigner"}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
