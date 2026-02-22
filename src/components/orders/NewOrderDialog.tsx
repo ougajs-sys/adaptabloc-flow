@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, ShoppingCart } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface StoreProduct {
+  id: string;
+  name: string;
+  price: number;
+}
 
 const orderItemSchema = z.object({
   name: z.string().min(1, "Requis").max(100),
@@ -37,6 +45,20 @@ interface NewOrderDialogProps {
 }
 
 export function NewOrderDialog({ open, onOpenChange, onSubmit }: NewOrderDialogProps) {
+  const { user } = useAuth();
+  const [products, setProducts] = useState<StoreProduct[]>([]);
+
+  useEffect(() => {
+    if (!open || !user?.store_id) return;
+    supabase
+      .from("products")
+      .select("id, name, price")
+      .eq("store_id", user.store_id)
+      .eq("is_active", true)
+      .order("name")
+      .then(({ data }) => setProducts(data || []));
+  }, [open, user?.store_id]);
+
   const form = useForm<NewOrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
@@ -147,7 +169,29 @@ export function NewOrderDialog({ open, onOpenChange, onSubmit }: NewOrderDialogP
                     <FormField control={form.control} name={`items.${index}.name`} render={({ field }) => (
                       <FormItem>
                         {index === 0 && <FormLabel className="text-xs">Article</FormLabel>}
-                        <FormControl><Input placeholder="Nom du produit" {...field} /></FormControl>
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            const product = products.find((p) => p.name === val);
+                            if (product) {
+                              form.setValue(`items.${index}.price`, product.price);
+                            }
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Choisir un produit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {products.map((p) => (
+                              <SelectItem key={p.id} value={p.name}>
+                                {p.name} — {p.price.toLocaleString("fr-FR")} F
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )} />
