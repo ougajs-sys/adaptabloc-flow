@@ -6,14 +6,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 export const HeroSection = () => {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithFacebook } = useAuth();
   const { toast } = useToast();
 
-  const handleGoogleSignIn = async () => {
+  const handleFacebookSignIn = async () => {
     try {
-      await signInWithGoogle();
+      await signInWithFacebook();
     } catch (err: any) {
-      toast({ title: "Erreur Google", description: err.message, variant: "destructive" });
+      toast({ title: "Erreur Facebook", description: err.message, variant: "destructive" });
     }
   };
 
@@ -49,9 +49,9 @@ export const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Button size="lg" className="text-base px-8 h-12 bg-white text-foreground border border-border hover:bg-muted" onClick={handleGoogleSignIn}>
-              <svg className="mr-2" width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.08 24.08 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-              Commencer avec Google
+            <Button size="lg" className="text-base px-8 h-12 text-white border-0" style={{ backgroundColor: "#1877F2" }} onClick={handleFacebookSignIn}>
+              <svg className="mr-2" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+              Commencer avec Facebook
             </Button>
             <Button size="lg" variant="outline" asChild className="text-base px-8 h-12">
               <a href="#how-it-works">Voir la démo</a>
