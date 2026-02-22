@@ -10,40 +10,42 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserPlus, AlertTriangle, ExternalLink } from "lucide-react";
-import { rolesRegistry, getMaxForRole, type TeamRole, type TeamMember } from "@/lib/team-roles";
+import { rolesRegistry, getMaxForRole, type TeamRole } from "@/lib/team-roles";
 import { useNavigate } from "react-router-dom";
 
 const memberSchema = z.object({
-  name: z.string().min(2, "Nom requis").max(100),
-  phone: z.string().min(8, "Téléphone requis").max(20),
+  email: z.string().email("Email invalide"),
   role: z.enum(["caller", "preparateur", "livreur"] as const),
 });
 
 export type NewMemberFormValues = z.infer<typeof memberSchema>;
 
+interface MemberLike { role: string }
+interface InviteLike { role: string }
+
 interface NewMemberDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSubmit: (values: NewMemberFormValues) => void;
-  existingMembers: TeamMember[];
+  existingMembers: MemberLike[];
+  existingInvitations: InviteLike[];
   activeModules: string[];
 }
 
 export function NewMemberDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-  existingMembers,
-  activeModules,
+  open, onOpenChange, onSubmit,
+  existingMembers, existingInvitations, activeModules,
 }: NewMemberDialogProps) {
   const navigate = useNavigate();
   const form = useForm<NewMemberFormValues>({
     resolver: zodResolver(memberSchema),
-    defaultValues: { name: "", phone: "", role: "caller" },
+    defaultValues: { email: "", role: "caller" },
   });
 
   const selectedRole = form.watch("role") as TeamRole;
-  const countForRole = existingMembers.filter((m) => m.role === selectedRole).length;
+  const countForRole =
+    existingMembers.filter((m) => m.role === selectedRole).length +
+    existingInvitations.filter((i) => i.role === selectedRole).length;
   const maxForRole = getMaxForRole(selectedRole, activeModules);
   const isAtLimit = maxForRole !== null && countForRole >= maxForRole;
 
@@ -60,7 +62,7 @@ export function NewMemberDialog({
         <DialogHeader>
           <DialogTitle className="font-[Space_Grotesk] flex items-center gap-2">
             <UserPlus size={18} />
-            Ajouter un membre
+            Inviter un membre
           </DialogTitle>
         </DialogHeader>
 
@@ -71,14 +73,14 @@ export function NewMemberDialog({
                 <FormLabel>Rôle</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {(["caller", "preparateur", "livreur"] as TeamRole[]).map((r) => {
                       const def = rolesRegistry[r];
-                      const count = existingMembers.filter((m) => m.role === r).length;
+                      const count =
+                        existingMembers.filter((m) => m.role === r).length +
+                        existingInvitations.filter((i) => i.role === r).length;
                       const max = getMaxForRole(r, activeModules);
                       const full = max !== null && count >= max;
                       return (
@@ -99,7 +101,6 @@ export function NewMemberDialog({
               </FormItem>
             )} />
 
-            {/* Quota warning */}
             {isAtLimit && (
               <Alert variant="destructive" className="py-2">
                 <AlertTriangle size={14} />
@@ -108,10 +109,7 @@ export function NewMemberDialog({
                   <button
                     type="button"
                     className="underline font-medium inline-flex items-center gap-1"
-                    onClick={() => {
-                      onOpenChange(false);
-                      navigate("/dashboard/modules");
-                    }}
+                    onClick={() => { onOpenChange(false); navigate("/dashboard/modules"); }}
                   >
                     Augmenter le quota <ExternalLink size={10} />
                   </button>
@@ -119,23 +117,14 @@ export function NewMemberDialog({
               </Alert>
             )}
 
-            <FormField control={form.control} name="name" render={({ field }) => (
+            <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem>
-                <FormLabel>Nom complet</FormLabel>
-                <FormControl><Input placeholder="Koné Mamadou" {...field} /></FormControl>
+                <FormLabel>Email du collaborateur</FormLabel>
+                <FormControl><Input type="email" placeholder="collaborateur@email.com" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="phone" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Téléphone</FormLabel>
-                <FormControl><Input placeholder="+225 07 12 34 56" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Role description */}
             {selectedRole && (
               <p className="text-xs text-muted-foreground bg-muted rounded-md px-3 py-2">
                 {rolesRegistry[selectedRole].description}
@@ -143,12 +132,9 @@ export function NewMemberDialog({
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Annuler
-              </Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
               <Button type="submit" disabled={isAtLimit} className="gap-2">
-                <UserPlus size={14} />
-                Ajouter
+                <UserPlus size={14} /> Inviter
               </Button>
             </DialogFooter>
           </form>
