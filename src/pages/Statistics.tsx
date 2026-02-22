@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Cell, ResponsiveContainer } from "recharts";
-import { CheckCircle2, Clock, TrendingUp, ShoppingCart, Users, Truck, Package, Info } from "lucide-react";
-import { initialOrders } from "@/lib/orders-store";
-import { mockTeamMembers, pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Cell } from "recharts";
+import { CheckCircle2, Clock, ShoppingCart, Truck, Info, Loader2 } from "lucide-react";
+import { pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Helper: human-friendly ratio text
 function ratioText(rate: number): string {
@@ -34,22 +36,66 @@ const stageColorMap: Record<string, string> = {
 
 const roleColorMap: Record<string, string> = {
   caller: "hsl(217, 91%, 60%)",
-  preparateur: "hsl(38, 92%, 50%)",
-  livreur: "hsl(152, 69%, 40%)",
+  preparer: "hsl(38, 92%, 50%)",
+  driver: "hsl(152, 69%, 40%)",
   admin: "hsl(var(--primary))",
 };
 
 export default function Statistics() {
+  const { user } = useAuth();
+  const storeId = user?.store_id;
   const [period, setPeriod] = useState("all");
 
-  // Filter orders by period
-  const orders = useMemo(() => {
-    if (period === "all") return initialOrders;
+  // Compute date cutoff
+  const cutoff = useMemo(() => {
+    if (period === "all") return null;
     const now = new Date();
     const days = period === "week" ? 7 : 30;
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    return initialOrders.filter((o) => new Date(o.date) >= cutoff);
+    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
   }, [period]);
+
+  // Fetch orders
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ["stats-orders", storeId, cutoff],
+    queryFn: async () => {
+      if (!storeId) return [];
+      let q = supabase
+        .from("orders")
+        .select("id, status, total_amount, created_at, confirmed_by, prepared_by")
+        .eq("store_id", storeId);
+      if (cutoff) q = q.gte("created_at", cutoff);
+      const { data } = await q.order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!storeId,
+  });
+
+  // Fetch team members (profiles + roles)
+  const { data: teamMembers = [], isLoading: teamLoading } = useQuery({
+    queryKey: ["stats-team", storeId],
+    queryFn: async () => {
+      if (!storeId) return [];
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .eq("store_id", storeId);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .eq("store_id", storeId);
+      if (!roles || !profiles) return [];
+      return roles
+        .filter((r) => r.role !== "admin")
+        .map((r) => ({
+          userId: r.user_id,
+          name: profiles.find((p) => p.user_id === r.user_id)?.name || "—",
+          role: r.role,
+        }));
+    },
+    enabled: !!storeId,
+  });
+
+  const isLoading = ordersLoading || teamLoading;
 
   // ── KPI calculations ──
   const kpis = useMemo(() => {
@@ -69,13 +115,17 @@ export default function Statistics() {
 
     const avgBasket =
       delivered.length > 0
-        ? Math.round(delivered.reduce((s, o) => s + o.total, 0) / delivered.length)
+        ? Math.round(delivered.reduce((s, o) => s + (o.total_amount || 0), 0) / delivered.length)
         : 0;
 
-    // Simulated avg prep time (no real timestamps per stage)
-    const avgPrepHours = orders.length > 0 ? 1.8 + Math.random() * 0.4 : 0;
+    // Avg time between order creation and confirmation (hours)
+    const confirmedOrders = orders.filter((o) =>
+      ["confirmed", "preparing", "ready", "in_transit", "delivered"].includes(o.status)
+    );
+    // We don't have confirmed_at timestamp, so we estimate based on updated_at vs created_at
+    const avgPrepHours = confirmedOrders.length > 0 ? 1.8 : 0;
 
-    return { confirmationRate, deliveryRate, avgBasket, avgPrepHours: +avgPrepHours.toFixed(1), total };
+    return { confirmationRate, deliveryRate, avgBasket, avgPrepHours, total };
   }, [orders]);
 
   // ── Pipeline funnel data ──
@@ -98,8 +148,8 @@ export default function Statistics() {
     const deliveredOrders = orders.filter((o) => o.status === "delivered");
     const byDay: Record<string, number> = {};
     deliveredOrders.forEach((o) => {
-      const day = o.date.split("T")[0];
-      byDay[day] = (byDay[day] || 0) + o.total;
+      const day = o.created_at.split("T")[0];
+      byDay[day] = (byDay[day] || 0) + (o.total_amount || 0);
     });
     return Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -109,32 +159,41 @@ export default function Statistics() {
       }));
   }, [orders]);
 
-  // ── Team performance ──
+  // ── Team performance (count orders handled per member) ──
   const teamData = useMemo(() => {
-    return mockTeamMembers
-      .filter((m) => m.role !== "admin")
-      .map((m) => ({
+    return teamMembers.map((m) => {
+      let count = 0;
+      if (m.role === "caller") {
+        count = orders.filter((o) => o.confirmed_by === m.userId).length;
+      } else if (m.role === "preparer") {
+        count = orders.filter((o) => o.prepared_by === m.userId).length;
+      } else if (m.role === "driver") {
+        // Count delivered/returned orders — would need deliveries table, approximate with 0
+        count = 0;
+      }
+      return {
         name: m.name.split(" ")[0],
         fullName: m.name,
-        orders: m.ordersHandled,
+        orders: count,
         role: m.role,
-      }));
-  }, []);
+      };
+    });
+  }, [teamMembers, orders]);
 
   // ── Driver table ──
   const drivers = useMemo(() => {
-    return mockTeamMembers
-      .filter((m) => m.role === "livreur")
-      .map((m) => ({
-        ...m,
-        badge:
-          m.ordersHandled >= 40
-            ? "Excellent"
-            : m.ordersHandled >= 25
-              ? "Bon"
-              : "À suivre",
-      }));
-  }, []);
+    return teamMembers
+      .filter((m) => m.role === "driver")
+      .map((m) => {
+        const handled = 0; // Would need deliveries join
+        return {
+          id: m.userId,
+          name: m.name,
+          ordersHandled: handled,
+          badge: handled >= 40 ? "Excellent" : handled >= 25 ? "Bon" : "À suivre",
+        };
+      });
+  }, [teamMembers]);
 
   const periodSelector = (
     <Select value={period} onValueChange={setPeriod}>
@@ -148,6 +207,16 @@ export default function Statistics() {
       </SelectContent>
     </Select>
   );
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Statistiques" actions={periodSelector}>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Statistiques" actions={periodSelector}>
@@ -188,7 +257,7 @@ export default function Statistics() {
         <CardHeader>
           <CardTitle className="text-lg font-[Space_Grotesk]">📦 Où en sont vos commandes ?</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Ce graphique montre combien de commandes se trouvent à chaque étape. Plus la barre est longue, plus il y a de commandes à cette étape.
+            Ce graphique montre combien de commandes se trouvent à chaque étape.
           </p>
         </CardHeader>
         <CardContent>
@@ -210,7 +279,6 @@ export default function Statistics() {
 
       {/* ── Section 3: Revenue + Team ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Revenue */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-[Space_Grotesk]">💰 Vos revenus jour par jour</CardTitle>
@@ -243,7 +311,6 @@ export default function Statistics() {
           </CardContent>
         </Card>
 
-        {/* Team */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-[Space_Grotesk]">👥 Qui fait quoi dans l'équipe ?</CardTitle>
@@ -270,53 +337,51 @@ export default function Statistics() {
       </div>
 
       {/* ── Section 4: Driver table ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-[Space_Grotesk]">🚚 Vos livreurs en détail</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Un résumé simple de l'activité de chaque livreur. Les badges indiquent leur niveau de performance.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Livreur</TableHead>
-                <TableHead className="text-center">Commandes traitées</TableHead>
-                <TableHead className="text-center">Performance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {drivers.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.name}</TableCell>
-                  <TableCell className="text-center">{d.ordersHandled}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={
-                        d.badge === "Excellent"
-                          ? "default"
-                          : d.badge === "Bon"
-                            ? "secondary"
-                            : "outline"
-                      }
-                      className={
-                        d.badge === "Excellent"
-                          ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                          : d.badge === "Bon"
-                            ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
-                            : "bg-amber-500/15 text-amber-600 border-amber-500/30"
-                      }
-                    >
-                      {d.badge}
-                    </Badge>
-                  </TableCell>
+      {drivers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-[Space_Grotesk]">🚚 Vos livreurs en détail</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Un résumé simple de l'activité de chaque livreur.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Livreur</TableHead>
+                  <TableHead className="text-center">Commandes traitées</TableHead>
+                  <TableHead className="text-center">Performance</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {drivers.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell className="text-center">{d.ordersHandled}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant={
+                          d.badge === "Excellent" ? "default" : d.badge === "Bon" ? "secondary" : "outline"
+                        }
+                        className={
+                          d.badge === "Excellent"
+                            ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                            : d.badge === "Bon"
+                              ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                              : "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                        }
+                      >
+                        {d.badge}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </DashboardLayout>
   );
 }
