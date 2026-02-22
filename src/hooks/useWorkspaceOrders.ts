@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -127,6 +127,32 @@ export function useWorkspaceOrders(statusFilter: string[]) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
     },
   });
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!storeId) return;
+
+    const channel = supabase
+      .channel(`workspace-orders-${statusFilter.join("-")}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `store_id=eq.${storeId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["workspace-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["workspace-today-stats"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [storeId, queryClient, statusFilter]);
 
   return { orders, isLoading, todayStats, updateStatus };
 }
