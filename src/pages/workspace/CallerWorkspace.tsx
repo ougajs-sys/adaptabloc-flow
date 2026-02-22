@@ -8,60 +8,52 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Phone, MapPin, CheckCircle2, XCircle, ArrowRight, MessageSquare, Package } from "lucide-react";
-import { initialOrders, type Order } from "@/lib/orders-store";
+import { Phone, MapPin, CheckCircle2, XCircle, MessageSquare, Package, Loader2 } from "lucide-react";
+import { useWorkspaceOrders, type WorkspaceOrder } from "@/hooks/useWorkspaceOrders";
 import { getStageByStatus, type OrderPipelineStatus } from "@/lib/team-roles";
 
 const CallerWorkspace = () => {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { orders, isLoading, todayStats, updateStatus } = useWorkspaceOrders([
+    "new", "caller_pending", "confirmed", "cancelled",
+  ]);
+  const [selectedOrder, setSelectedOrder] = useState<WorkspaceOrder | null>(null);
   const [note, setNote] = useState("");
 
-  // Caller sees: new + caller_pending orders
-  const callerOrders = orders.filter((o) =>
-    ["new", "caller_pending"].includes(o.status)
-  );
-  const confirmedToday = orders.filter(
-    (o) => o.status === "confirmed" && new Date(o.date).toDateString() === new Date().toDateString()
-  ).length;
-  const cancelledToday = orders.filter(
-    (o) => o.status === "cancelled" && new Date(o.date).toDateString() === new Date().toDateString()
-  ).length;
+  const callerOrders = orders.filter((o) => ["new", "caller_pending"].includes(o.status));
 
-  const handlePickUp = useCallback((order: Order) => {
-    // Move from "new" → "caller_pending" (caller picks it up)
+  const handlePickUp = useCallback((order: WorkspaceOrder) => {
     if (order.status === "new") {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === order.id ? { ...o, status: "caller_pending" as OrderPipelineStatus } : o))
-      );
+      updateStatus.mutate({ dbId: order.dbId, status: "caller_pending" });
     }
-    setSelectedOrder(orders.find((o) => o.id === order.id) || order);
+    setSelectedOrder(order);
     setNote("");
-  }, [orders]);
+  }, [updateStatus]);
 
   const handleConfirm = useCallback(() => {
     if (!selectedOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === selectedOrder.id
-          ? { ...o, status: "confirmed" as OrderPipelineStatus, callerNote: note || undefined }
-          : o
-      )
+    updateStatus.mutate(
+      { dbId: selectedOrder.dbId, status: "confirmed", notes: note || undefined },
+      { onSuccess: () => setSelectedOrder(null) }
     );
-    setSelectedOrder(null);
-  }, [selectedOrder, note]);
+  }, [selectedOrder, note, updateStatus]);
 
   const handleCancel = useCallback(() => {
     if (!selectedOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === selectedOrder.id
-          ? { ...o, status: "cancelled" as OrderPipelineStatus, callerNote: note || undefined }
-          : o
-      )
+    updateStatus.mutate(
+      { dbId: selectedOrder.dbId, status: "cancelled", notes: note || undefined },
+      { onSuccess: () => setSelectedOrder(null) }
     );
-    setSelectedOrder(null);
-  }, [selectedOrder, note]);
+  }, [selectedOrder, note, updateStatus]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Espace Caller" subtitle="Confirmation des commandes">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>
@@ -77,7 +69,6 @@ const CallerWorkspace = () => {
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Client info */}
                 <Card className="border-border/60">
                   <CardContent className="p-4 space-y-2">
                     <p className="font-medium">{selectedOrder.customer}</p>
@@ -92,7 +83,6 @@ const CallerWorkspace = () => {
                   </CardContent>
                 </Card>
 
-                {/* Items */}
                 <div>
                   <p className="text-sm font-medium mb-2 flex items-center gap-1">
                     <Package size={14} /> Articles commandés
@@ -115,7 +105,6 @@ const CallerWorkspace = () => {
                   </div>
                 </div>
 
-                {/* Note */}
                 <div>
                   <label className="text-sm font-medium flex items-center gap-1 mb-1">
                     <MessageSquare size={14} /> Note d'appel
@@ -130,10 +119,10 @@ const CallerWorkspace = () => {
               </div>
 
               <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="destructive" onClick={handleCancel} className="gap-1">
+                <Button variant="destructive" onClick={handleCancel} disabled={updateStatus.isPending} className="gap-1">
                   <XCircle size={16} /> Annuler la commande
                 </Button>
-                <Button onClick={handleConfirm} className="gap-1">
+                <Button onClick={handleConfirm} disabled={updateStatus.isPending} className="gap-1">
                   <CheckCircle2 size={16} /> Confirmer
                 </Button>
               </DialogFooter>
@@ -143,7 +132,6 @@ const CallerWorkspace = () => {
       </Dialog>
 
       <DashboardLayout title="Espace Caller" subtitle="Confirmation des commandes">
-        {/* KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
@@ -154,18 +142,17 @@ const CallerWorkspace = () => {
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Confirmées aujourd'hui</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{confirmedToday}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{todayStats.confirmed}</p>
             </CardContent>
           </Card>
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Annulées aujourd'hui</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk] text-destructive">{cancelledToday}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk] text-destructive">{todayStats.cancelled}</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Order queue */}
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-[Space_Grotesk]">
@@ -182,7 +169,7 @@ const CallerWorkspace = () => {
               const stage = getStageByStatus(order.status);
               return (
                 <div
-                  key={order.id}
+                  key={order.dbId}
                   className="flex items-center gap-4 p-3 rounded-lg border border-border/60 hover:bg-muted/30 transition-colors"
                 >
                   <Avatar className="h-10 w-10">

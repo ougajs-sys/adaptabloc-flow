@@ -10,52 +10,48 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Truck, MapPin, Phone, CheckCircle2, RotateCcw, Navigation, Package, Banknote } from "lucide-react";
-import { initialOrders, type Order } from "@/lib/orders-store";
+import { Truck, MapPin, Phone, CheckCircle2, RotateCcw, Navigation, Package, Banknote, Loader2 } from "lucide-react";
+import { useWorkspaceOrders, type WorkspaceOrder } from "@/hooks/useWorkspaceOrders";
 import { getStageByStatus, type OrderPipelineStatus } from "@/lib/team-roles";
 
 type DeliveryOutcome = "delivered" | "returned";
 
 const LivreurWorkspace = () => {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { orders, isLoading, todayStats, updateStatus } = useWorkspaceOrders([
+    "ready", "in_transit", "shipping", "delivered", "returned",
+  ]);
+  const [selectedOrder, setSelectedOrder] = useState<WorkspaceOrder | null>(null);
   const [outcome, setOutcome] = useState<DeliveryOutcome>("delivered");
   const [note, setNote] = useState("");
 
-  // Livreur sees: ready + in_transit
   const livreurOrders = orders.filter((o) => ["ready", "in_transit"].includes(o.status));
-  const deliveredToday = orders.filter(
-    (o) => o.status === "delivered" && new Date(o.date).toDateString() === new Date().toDateString()
-  ).length;
-  const returnedToday = orders.filter(
-    (o) => o.status === "returned" && new Date(o.date).toDateString() === new Date().toDateString()
-  ).length;
-  const totalCollected = orders
-    .filter((o) => o.status === "delivered" && o.paymentStatus === "paid")
-    .reduce((s, o) => s + o.total, 0);
 
-  const handlePickUp = useCallback((order: Order) => {
+  const handlePickUp = useCallback((order: WorkspaceOrder) => {
     if (order.status === "ready") {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === order.id ? { ...o, status: "in_transit" as OrderPipelineStatus } : o))
-      );
+      updateStatus.mutate({ dbId: order.dbId, status: "in_transit" });
     }
     setSelectedOrder(order);
     setOutcome("delivered");
     setNote("");
-  }, []);
+  }, [updateStatus]);
 
   const handleFinalize = useCallback(() => {
     if (!selectedOrder) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === selectedOrder.id
-          ? { ...o, status: outcome as OrderPipelineStatus, deliveryNote: note || undefined }
-          : o
-      )
+    updateStatus.mutate(
+      { dbId: selectedOrder.dbId, status: outcome as OrderPipelineStatus, notes: note || undefined },
+      { onSuccess: () => setSelectedOrder(null) }
     );
-    setSelectedOrder(null);
-  }, [selectedOrder, outcome, note]);
+  }, [selectedOrder, outcome, note, updateStatus]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Espace Livreur" subtitle="Gestion des livraisons">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>
@@ -71,7 +67,6 @@ const LivreurWorkspace = () => {
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Destination */}
                 <Card className="border-border/60">
                   <CardContent className="p-4 space-y-2">
                     <p className="font-medium">{selectedOrder.customer}</p>
@@ -95,7 +90,6 @@ const LivreurWorkspace = () => {
                   </CardContent>
                 </Card>
 
-                {/* Colis summary */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                   <Package size={16} className="text-muted-foreground" />
                   <span className="text-sm">{selectedOrder.items.length} article{selectedOrder.items.length > 1 ? "s" : ""}</span>
@@ -105,7 +99,6 @@ const LivreurWorkspace = () => {
                   </span>
                 </div>
 
-                {/* Outcome */}
                 <div>
                   <label className="text-sm font-medium mb-1 block">Résultat de la livraison</label>
                   <Select value={outcome} onValueChange={(v) => setOutcome(v as DeliveryOutcome)}>
@@ -142,6 +135,7 @@ const LivreurWorkspace = () => {
                 <Button
                   onClick={handleFinalize}
                   variant={outcome === "returned" ? "destructive" : "default"}
+                  disabled={updateStatus.isPending}
                   className="gap-1"
                 >
                   {outcome === "delivered" ? (
@@ -157,7 +151,6 @@ const LivreurWorkspace = () => {
       </Dialog>
 
       <DashboardLayout title="Espace Livreur" subtitle="Gestion des livraisons">
-        {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
@@ -168,24 +161,23 @@ const LivreurWorkspace = () => {
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Livrées aujourd'hui</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{deliveredToday}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk] text-accent">{todayStats.delivered}</p>
             </CardContent>
           </Card>
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Retours</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk] text-destructive">{returnedToday}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk] text-destructive">{todayStats.returned}</p>
             </CardContent>
           </Card>
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground">Montant collecté</p>
-              <p className="text-xl font-bold font-[Space_Grotesk] text-foreground">{totalCollected.toLocaleString("fr-FR")} F</p>
+              <p className="text-xl font-bold font-[Space_Grotesk] text-foreground">{todayStats.collected.toLocaleString("fr-FR")} F</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Delivery queue */}
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-[Space_Grotesk]">
@@ -203,7 +195,7 @@ const LivreurWorkspace = () => {
               const isInTransit = order.status === "in_transit";
               return (
                 <div
-                  key={order.id}
+                  key={order.dbId}
                   className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
                     isInTransit ? "border-emerald-500/40 bg-emerald-500/5" : "border-border/60 hover:bg-muted/30"
                   }`}
