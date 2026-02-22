@@ -1,115 +1,76 @@
 
+# Corriger le systeme d'invitation par email
 
-# Strategie d'integration Facebook/Meta pour Intramate
+## Probleme 1 : Aucun email d'invitation n'est envoye
 
-## Analyse des deux options
+Actuellement, cliquer "Inviter" insere simplement une ligne dans la table `team_invitations`. Personne ne recoit de notification.
 
-### Option 1 : App embarquee dans Facebook (Facebook Tab / Embedded App)
-**Verdict : Non viable sur Lovable**
+### Solution : Creer une Edge Function `send-invitation`
 
-Integrer Intramate directement dans Facebook (comme une app Facebook Page Tab ou un Instant Game) necessite :
-- Un serveur backend capable de gerer le protocole Facebook Signed Request
-- Un hebergement sur un domaine valide par Facebook App Review
-- Une certification App Review complete par Meta
+Cette fonction sera appelee apres l'insertion de l'invitation et enverra un email via le service d'email integre de Lovable Cloud (Supabase Auth Admin).
 
-Lovable ne permet pas ce type d'architecture serveur. De plus, Facebook a progressivement retire le support des Page Tabs depuis 2020.
+**Flux :**
+1. L'admin clique "Inviter" dans l'interface
+2. L'invitation est inseree dans `team_invitations` (existant)
+3. Le client appelle la nouvelle Edge Function `send-invitation` avec l'email, le role et le nom de la boutique
+4. L'Edge Function utilise l'API Admin pour generer un lien d'inscription magique (invite link)
+5. Le collaborateur recoit un email avec un lien pour rejoindre l'equipe
 
-### Option 2 : Intramate comme hub central avec APIs Meta (RECOMMANDEE)
-**Verdict : Faisable et strategiquement pertinent**
+**Fichiers a creer :**
+- `supabase/functions/send-invitation/index.ts` : Edge Function qui genere et envoie le lien d'invitation via `supabase.auth.admin.inviteUserByEmail()` ou `generateLink()`
 
-Intramate reste une app web independante, mais s'integre profondement avec l'ecosysteme Meta via les APIs officielles :
-- **Facebook Login** pour l'authentification (via Edge Function, pas OAuth Lovable Cloud)
-- **WhatsApp Business API** pour les notifications et la prise de commande
-- **Messenger Platform** pour les chatbots de vente
-- **Instagram Graph API** pour la gestion des DMs commerciaux
+**Fichiers a modifier :**
+- `src/pages/Team.tsx` : Modifier `inviteMutation` pour appeler l'Edge Function apres l'insertion dans `team_invitations`
 
 ---
 
-## Plan d'implementation : Integration Meta via Edge Functions
+## Probleme 2 : Erreur 400 sur la page Equipe
 
-L'approche technique contourne la limitation de Lovable Cloud (pas de Facebook OAuth natif) en utilisant des Edge Functions comme proxy d'authentification.
+La requete `user_roles.select("..., profiles!inner(...)")` echoue car il n'y a pas de foreign key entre `user_roles` et `profiles`. Les deux tables ont chacune un `user_id` vers `auth.users`, mais PostgREST ne peut pas deviner la relation.
 
-### Phase 1 : Facebook Login via Edge Function
+### Solution : Modifier la requete pour faire deux appels separes
 
-Creer une edge function `facebook-auth` qui :
-1. Recoit le code OAuth de Facebook (cote client, on ouvre une popup Facebook Login)
-2. Echange le code contre un access token via l'API Graph
-3. Recupere le profil utilisateur (nom, email, photo, facebook_id)
-4. Cree ou connecte l'utilisateur dans la base via le service role Supabase
-5. Retourne un token de session Supabase au client
+Au lieu d'un JOIN PostgREST impossible, la page Equipe fera :
+1. Une requete sur `user_roles` pour obtenir les roles (user_id, role)
+2. Une requete sur `profiles` pour obtenir les infos (user_id, name, email, phone, avatar_url)
+3. Un merge cote client par `user_id`
 
-**Fichiers a creer/modifier :**
+**Fichier a modifier :**
+- `src/pages/Team.tsx` : Remplacer la requete unique avec JOIN par deux requetes separees + merge
 
-| Fichier | Description |
-|---------|-------------|
-| `supabase/functions/facebook-auth/index.ts` | Edge function qui echange le code Facebook contre une session Supabase |
-| `src/lib/facebook-login.ts` | Utilitaire client qui ouvre la popup Facebook et recupere le code |
-| `src/contexts/AuthContext.tsx` | Ajout de `signInWithFacebook()` |
-| `src/pages/Login.tsx` | Ajout du bouton "Continuer avec Facebook" |
-| `src/components/landing/HeroSection.tsx` | Restauration du bouton Facebook |
-| `src/components/landing/Navbar.tsx` | Mise a jour du bouton CTA |
-| `src/components/landing/CTASection.tsx` | Mise a jour du bouton CTA |
+---
 
-**Flux technique :**
+## Detail technique
+
+### Edge Function `send-invitation`
 
 ```text
-1. Client ouvre popup : https://www.facebook.com/v19.0/dialog/oauth?client_id=210441536707008&redirect_uri=...&scope=email,public_profile
-2. Utilisateur autorise -> Facebook redirige avec ?code=XXX
-3. Client envoie le code a l'edge function /facebook-auth
-4. Edge function :
-   a. Echange code -> access_token via Graph API
-   b. Appelle /me?fields=id,name,email,picture -> profil Facebook
-   c. Cherche si un user existe avec cet email dans auth.users
-   d. Si oui : genere une session Supabase pour cet user
-   e. Si non : cree un nouveau user (signUp server-side) + session
-   f. Sauvegarde facebook_id dans la table profiles
-   g. Retourne { session, isNewUser }
-5. Client recoit la session -> setSession() -> redirection
+POST /send-invitation
+Body: { store_id, email, role, store_name }
+
+1. Verifie que l'appelant est admin du store (via JWT)
+2. Utilise supabase.auth.admin.inviteUserByEmail(email, { redirectTo: origin + "/login" })
+   - Cela envoie automatiquement un email d'invitation via Lovable Cloud
+3. Retourne { success: true }
 ```
 
-**Secret necessaire :** `FACEBOOK_APP_SECRET` (le secret de l'App ID 210441536707008)
+L'email contient un lien. Quand l'invite clique dessus et s'inscrit, le trigger existant `handle_invited_user` prend le relais automatiquement pour assigner le role et creer le profil.
 
-### Phase 2 : Migration base de donnees
+### Correction de la requete Team members
 
-Ajouter les colonnes manquantes a la table `profiles` :
+```text
+Avant (echoue) :
+  user_roles.select("id, user_id, role, profiles!inner(name, email, phone, avatar_url)")
 
-```sql
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS facebook_id TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sector TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free';
-CREATE INDEX IF NOT EXISTS idx_profiles_facebook_id ON profiles(facebook_id);
+Apres (fonctionne) :
+  1. user_roles.select("id, user_id, role").eq("store_id", storeId)
+  2. profiles.select("user_id, name, email, phone, avatar_url").eq("store_id", storeId)
+  3. Merge cote client par user_id
 ```
 
-### Phase 3 : WhatsApp Business API (module Campagnes)
+### Ordre d'implementation
 
-Creer une edge function `whatsapp-send` qui utilise l'API WhatsApp Business Cloud pour :
-- Envoyer des messages templates (confirmations de commande, notifications)
-- Recevoir des messages entrants via webhook
-
-Cela connecte directement le module "Campagnes SMS/WhatsApp" existant au vrai backend WhatsApp.
-
-**Secret necessaire :** `WHATSAPP_TOKEN` (token d'acces WhatsApp Business)
-
-### Phase 4 : Messenger Chatbot (futur)
-
-Webhook Messenger pour recevoir des commandes directement depuis Facebook Messenger, creant automatiquement des commandes dans Intramate.
-
-### Phase 5 : Instagram DMs (futur)
-
-Integration Instagram Graph API pour gerer les DMs commerciaux depuis le dashboard Intramate.
-
----
-
-## Priorite d'implementation immediate
-
-La Phase 1 (Facebook Login) et Phase 2 (migration DB) seront implementees en premier car elles resolvent le probleme principal : permettre aux utilisateurs Facebook de se connecter nativement.
-
-Les phases 3-5 sont des evolutions qui renforcent le positionnement "hub Meta" mais ne bloquent pas le lancement.
-
-## Ce qui restera en place
-
-- Google OAuth (via Lovable Cloud) reste disponible comme methode alternative
-- Email/password reste disponible
-- Les trois methodes coexistent sur la page login
-
+1. Migration DB : aucune necessaire (les tables existent deja)
+2. Creer l'Edge Function `send-invitation`
+3. Corriger la requete dans `Team.tsx` (deux requetes separees)
+4. Modifier `inviteMutation` pour appeler l'Edge Function apres l'insertion
