@@ -14,26 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Send, MessageSquare, Mail, Phone, TrendingUp, Eye, MousePointerClick } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Send, MessageSquare, Mail, Phone, Eye, MousePointerClick, Loader2, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-interface Campaign {
-  id: string;
-  name: string;
-  channel: "sms" | "whatsapp" | "email";
-  status: "sent" | "draft" | "scheduled";
-  recipients: number;
-  opened: number;
-  clicked: number;
-  date: string;
-}
-
-const mockCampaigns: Campaign[] = [
-  { id: "CMP-001", name: "Promo Saint-Valentin", channel: "whatsapp", status: "sent", recipients: 450, opened: 312, clicked: 89, date: "2026-02-10" },
-  { id: "CMP-002", name: "Nouveautés Février", channel: "sms", status: "sent", recipients: 820, opened: 654, clicked: 142, date: "2026-02-05" },
-  { id: "CMP-003", name: "Soldes Flash", channel: "email", status: "sent", recipients: 1200, opened: 890, clicked: 234, date: "2026-01-28" },
-  { id: "CMP-004", name: "Bienvenue nouveaux clients", channel: "whatsapp", status: "draft", recipients: 0, opened: 0, clicked: 0, date: "2026-02-15" },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const channelIcons: Record<string, typeof MessageSquare> = {
   sms: Phone,
@@ -47,42 +36,95 @@ const channelLabels: Record<string, string> = {
   email: "Email",
 };
 
-let campaignCounter = mockCampaigns.length + 1;
+const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  sent: { label: "Envoyée", variant: "default" },
+  draft: { label: "Brouillon", variant: "secondary" },
+  scheduled: { label: "Planifiée", variant: "outline" },
+  cancelled: { label: "Annulée", variant: "destructive" },
+};
 
 const CampaignsContent = () => {
-  const [campaigns, setCampaigns] = useState(mockCampaigns);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const storeId = user?.store_id;
+
   const [newOpen, setNewOpen] = useState(false);
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<"sms" | "whatsapp" | "email">("whatsapp");
   const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const totalSent = campaigns.filter((c) => c.status === "sent").reduce((s, c) => s + c.recipients, 0);
-  const totalOpened = campaigns.filter((c) => c.status === "sent").reduce((s, c) => s + c.opened, 0);
-  const totalClicked = campaigns.filter((c) => c.status === "sent").reduce((s, c) => s + c.clicked, 0);
+  // Fetch campaigns
+  const { data: campaigns = [], isLoading } = useQuery({
+    queryKey: ["campaigns", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("*")
+        .eq("store_id", storeId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Create campaign
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("campaigns").insert({
+        store_id: storeId!,
+        name,
+        type: channel,
+        message_content: message || null,
+        status: "draft",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      setName("");
+      setMessage("");
+      setNewOpen(false);
+      toast({ title: "Campagne créée", description: `"${name}" est en brouillon.` });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Delete campaign
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Delete recipients first
+      await supabase.from("campaign_recipients").delete().eq("campaign_id", id);
+      const { error } = await supabase.from("campaigns").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      setDeletingId(null);
+      toast({ title: "Campagne supprimée" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const sentCampaigns = campaigns.filter((c) => c.status === "sent");
+  const totalSent = sentCampaigns.reduce((s, c) => s + (c.recipient_count || 0), 0);
+  const totalOpened = sentCampaigns.reduce((s, c) => s + (c.opened_count || 0), 0);
+  const totalClicked = sentCampaigns.reduce((s, c) => s + (c.converted_count || 0), 0);
   const openRate = totalSent > 0 ? Math.round((totalOpened / totalSent) * 100) : 0;
   const clickRate = totalOpened > 0 ? Math.round((totalClicked / totalOpened) * 100) : 0;
 
-  const handleCreate = () => {
-    if (!name.trim()) return;
-    const newCampaign: Campaign = {
-      id: `CMP-${String(campaignCounter++).padStart(3, "0")}`,
-      name,
-      channel,
-      status: "draft",
-      recipients: 0,
-      opened: 0,
-      clicked: 0,
-      date: new Date().toISOString().split("T")[0],
-    };
-    setCampaigns((prev) => [newCampaign, ...prev]);
-    setName("");
-    setMessage("");
-    setNewOpen(false);
-    toast({ title: "Campagne créée", description: `"${newCampaign.name}" est en brouillon.` });
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+      </div>
+    );
+  }
 
   return (
     <>
+      {/* New campaign dialog */}
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -113,18 +155,34 @@ const CampaignsContent = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)}>Annuler</Button>
-            <Button onClick={handleCreate} className="gap-2" disabled={!name.trim()}>
+            <Button onClick={() => createMutation.mutate()} className="gap-2" disabled={!name.trim() || createMutation.isPending}>
               <Send size={14} /> Créer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Delete dialog */}
+      <AlertDialog open={!!deletingId} onOpenChange={(v) => { if (!v) setDeletingId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette campagne ?</AlertDialogTitle>
+            <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deletingId && deleteMutation.mutate(deletingId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="space-y-6">
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Campagnes envoyées", value: campaigns.filter((c) => c.status === "sent").length, icon: Send },
+            { label: "Campagnes envoyées", value: sentCampaigns.length, icon: Send },
             { label: "Destinataires total", value: totalSent.toLocaleString("fr-FR"), icon: MessageSquare },
             { label: "Taux d'ouverture", value: `${openRate}%`, icon: Eye },
             { label: "Taux de clic", value: `${clickRate}%`, icon: MousePointerClick },
@@ -147,46 +205,59 @@ const CampaignsContent = () => {
             <CardTitle className="text-base font-[Space_Grotesk]">Historique des campagnes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campagne</TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead>Destinataires</TableHead>
-                  <TableHead>Ouvertures</TableHead>
-                  <TableHead>Clics</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((c) => {
-                  const Icon = channelIcons[c.channel];
-                  return (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium text-sm">{c.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Icon size={14} className="text-muted-foreground" />
-                          <span className="text-sm">{channelLabels[c.channel]}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{c.recipients}</TableCell>
-                      <TableCell className="text-sm">{c.opened}</TableCell>
-                      <TableCell className="text-sm">{c.clicked}</TableCell>
-                      <TableCell>
-                        <Badge variant={c.status === "sent" ? "default" : c.status === "draft" ? "secondary" : "outline"} className="text-xs">
-                          {c.status === "sent" ? "Envoyée" : c.status === "draft" ? "Brouillon" : "Planifiée"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(c.date).toLocaleDateString("fr-FR")}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {campaigns.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Send size={40} className="mx-auto mb-3 opacity-30" />
+                <p>Aucune campagne encore</p>
+                <p className="text-sm">Créez votre première campagne marketing.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campagne</TableHead>
+                    <TableHead>Canal</TableHead>
+                    <TableHead>Destinataires</TableHead>
+                    <TableHead>Ouvertures</TableHead>
+                    <TableHead>Conversions</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {campaigns.map((c) => {
+                    const Icon = channelIcons[c.type] || MessageSquare;
+                    const st = statusLabels[c.status] || statusLabels.draft;
+                    return (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Icon size={14} className="text-muted-foreground" />
+                            <span className="text-sm">{channelLabels[c.type] || c.type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{c.recipient_count || 0}</TableCell>
+                        <TableCell className="text-sm">{c.opened_count || 0}</TableCell>
+                        <TableCell className="text-sm">{c.converted_count || 0}</TableCell>
+                        <TableCell>
+                          <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(c.created_at).toLocaleDateString("fr-FR")}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingId(c.id)}>
+                            <Trash2 size={14} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
