@@ -5,15 +5,34 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useModules } from "@/contexts/ModulesContext";
 import { getModuleById, FREE_MODULE_IDS, modulesRegistry, tierLabels } from "@/lib/modules-registry";
-import { mockInvoices } from "@/lib/billing-store";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Check, Package, ArrowRight, Receipt, CreditCard, Layers } from "lucide-react";
+import { Check, Package, ArrowRight, Receipt, CreditCard, Layers, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 const Billing = () => {
   const { activeModules, monthlyPrice } = useModules();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const storeId = user?.store_id;
+
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ["invoices", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("*")
+        .eq("store_id", storeId!)
+        .order("issued_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const paidModules = activeModules
     .map((id) => getModuleById(id))
@@ -161,6 +180,16 @@ const Billing = () => {
           </div>
 
           <Card>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="animate-spin text-muted-foreground" size={24} />
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <Receipt size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Aucune facture pour le moment.</p>
+              </div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -171,20 +200,21 @@ const Billing = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockInvoices.map((inv) => (
+                {invoices.map((inv) => (
                   <TableRow key={inv.id}>
-                    <TableCell className="font-mono text-xs">{inv.id}</TableCell>
-                    <TableCell className="text-sm">{new Date(inv.date).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell className="font-mono text-xs">{inv.invoice_number}</TableCell>
+                    <TableCell className="text-sm">{new Date(inv.issued_at).toLocaleDateString("fr-FR")}</TableCell>
                     <TableCell className="text-sm font-medium">{inv.amount.toLocaleString("fr-FR")} FCFA</TableCell>
                     <TableCell>
-                      <Badge variant={inv.status === "paid" ? "default" : inv.status === "pending" ? "secondary" : "destructive"} className="text-xs">
-                        {inv.status === "paid" ? "Payée" : inv.status === "pending" ? "En attente" : "Échouée"}
+                      <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : "secondary"} className="text-xs">
+                        {inv.status === "paid" ? "Payée" : inv.status === "sent" ? "Envoyée" : inv.status === "overdue" ? "En retard" : inv.status === "draft" ? "Brouillon" : "Annulée"}
                       </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            )}
           </Card>
         </div>
       </div>
