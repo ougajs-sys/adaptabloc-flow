@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { ModuleGate } from "@/components/modules/ModuleGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,18 +12,20 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Copy, Eye, Code, BarChart3, Trash2, ExternalLink, Check } from "lucide-react";
+import { Plus, Copy, Eye, Code, BarChart3, Trash2, ExternalLink, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface EmbedForm {
   id: string;
   name: string;
-  status: "active" | "draft";
+  status: "active" | "draft" | "archived";
   fields: FormField[];
   style: FormStyle;
-  createdAt: string;
-  submissions: number;
-  conversions: number;
+  created_at: string;
+  submissions_count: number;
+  conversions_count: number;
 }
 
 interface FormField {
@@ -55,62 +58,91 @@ const defaultStyle: FormStyle = {
   successMessage: "Merci ! Votre commande a été enregistrée. Nous vous contacterons sous peu.",
 };
 
-const mockForms: EmbedForm[] = [
-  {
-    id: "f1",
-    name: "Formulaire Landing Page Principale",
-    status: "active",
-    fields: defaultFields,
-    style: defaultStyle,
-    createdAt: "2025-01-15",
-    submissions: 247,
-    conversions: 189,
-  },
-  {
-    id: "f2",
-    name: "Formulaire Promo Facebook",
-    status: "draft",
-    fields: defaultFields.slice(0, 3),
-    style: { ...defaultStyle, primaryColor: "#1877F2", buttonText: "Profiter de l'offre" },
-    createdAt: "2025-02-01",
-    submissions: 0,
-    conversions: 0,
-  },
-];
-
 function generateEmbedCode(form: EmbedForm, type: "html" | "wordpress" | "elementor"): string {
-  const baseUrl = "https://app.intramate.africa/embed";
-  if (type === "html") {
-    return `<!-- Intramate Formulaire Embarqué -->
-<div id="intramate-form-${form.id}"></div>
-<script src="${baseUrl}/sdk.js"></script>
+  const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-form`;
+  
+  // Script to handle form submission
+  const scriptContent = `
 <script>
-  Intramate.init({
-    formId: "${form.id}",
-    container: "#intramate-form-${form.id}",
-    theme: {
-      primaryColor: "${form.style.primaryColor}",
-      borderRadius: "${form.style.borderRadius}"
-    }
-  });
-</script>`;
-  }
-  if (type === "wordpress") {
-    return `[intramate_form id="${form.id}" color="${form.style.primaryColor}" radius="${form.style.borderRadius}"]
+  (function() {
+    const formId = "intramate-form-${form.id}";
+    const formElement = document.getElementById(formId);
+    
+    if (!formElement) return;
 
-<!-- Ou en shortcode PHP dans votre thème : -->
-<?php echo do_shortcode('[intramate_form id="${form.id}"]'); ?>`;
-  }
-  return `<!-- Elementor : Ajouter un widget HTML personnalisé -->
-<!-- Collez ce code dans un widget "HTML" d'Elementor -->
-<div id="intramate-form-${form.id}"></div>
-<script src="${baseUrl}/sdk.js"></script>
-<script>
-  Intramate.init({
-    formId: "${form.id}",
-    container: "#intramate-form-${form.id}"
-  });
+    formElement.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const submitBtn = formElement.querySelector("button[type=submit]");
+      const originalText = submitBtn.innerText;
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Traitement...";
+
+      const formData = new FormData(formElement);
+      const data = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch("${functionUrl}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formId: "${form.id}", data }),
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          formElement.innerHTML = \`<div style="padding: 20px; text-align: center; color: green; font-weight: bold;">\${result.message}</div>\`;
+        } else {
+          alert("Erreur: " + (result.error || "Une erreur est survenue"));
+          submitBtn.disabled = false;
+          submitBtn.innerText = originalText;
+        }
+      } catch (error) {
+        console.error("Error submitting form:", error);
+        alert("Erreur de connexion");
+        submitBtn.disabled = false;
+        submitBtn.innerText = originalText;
+      }
+    });
+  })();
 </script>`;
+
+  // HTML Form structure
+  const formHtml = `
+<div id="intramate-form-${form.id}" style="max-width: 400px; margin: 0 auto; font-family: sans-serif; border: 1px solid #e2e8f0; padding: 20px; border-radius: ${form.style.borderRadius}; background: #fff;">
+  <h3 style="margin-top: 0; margin-bottom: 20px; text-align: center;">Passer commande</h3>
+  <form style="display: flex; flex-direction: column; gap: 15px;">
+    ${form.fields.map(field => `
+    <div>
+      <label style="display: block; margin-bottom: 5px; font-size: 14px; font-weight: 500;">${field.label} ${field.required ? '<span style="color: red;">*</span>' : ''}</label>
+      ${field.type === 'select' ? `
+      <select name="${field.label}" ${field.required ? 'required' : ''} style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+        <option value="">${field.placeholder}</option>
+        <option value="Produit A">Produit A</option>
+        <option value="Produit B">Produit B</option>
+      </select>` : `
+      <input type="${field.type === 'phone' ? 'tel' : field.type}" name="${field.label}" placeholder="${field.placeholder}" ${field.required ? 'required' : ''} style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;" />`}
+    </div>`).join('')}
+    <button type="submit" style="background-color: ${form.style.primaryColor}; color: white; padding: 10px; border: none; border-radius: ${form.style.borderRadius}; cursor: pointer; font-weight: bold; margin-top: 10px;">
+      ${form.style.buttonText}
+    </button>
+  </form>
+</div>`;
+
+  if (type === "html") {
+    return `<!-- Intramate Formulaire -->
+${formHtml}
+${scriptContent}`;
+  }
+  
+  if (type === "wordpress") {
+    return `<!-- Insérez ce code dans un bloc HTML personnalisé -->
+${formHtml}
+${scriptContent}`;
+  }
+  
+  return `<!-- Elementor Widget HTML -->
+${formHtml}
+${scriptContent}`;
 }
 
 function FormPreview({ form }: { form: EmbedForm }) {
@@ -158,7 +190,7 @@ function FormBuilderDialog({
   trigger,
 }: {
   form?: EmbedForm;
-  onSave: (f: EmbedForm) => void;
+  onSave: (f: Partial<EmbedForm>) => void;
   trigger: React.ReactNode;
 }) {
   const [name, setName] = useState(form?.name ?? "");
@@ -167,17 +199,13 @@ function FormBuilderDialog({
   const [open, setOpen] = useState(false);
 
   const handleSave = () => {
-    const saved: EmbedForm = {
-      id: form?.id ?? `f${Date.now()}`,
+    onSave({
+      id: form?.id,
       name: name || "Nouveau formulaire",
-      status: "draft",
       fields,
       style,
-      createdAt: form?.createdAt ?? new Date().toISOString().slice(0, 10),
-      submissions: form?.submissions ?? 0,
-      conversions: form?.conversions ?? 0,
-    };
-    onSave(saved);
+      status: form?.status || "draft",
+    });
     setOpen(false);
   };
 
@@ -306,7 +334,16 @@ function FormBuilderDialog({
           <div>
             <Label className="mb-2 block">Aperçu</Label>
             <div className="border rounded-lg p-4 bg-muted/20">
-              <FormPreview form={{ id: "preview", name, status: "draft", fields, style, createdAt: "", submissions: 0, conversions: 0 }} />
+              <FormPreview form={{ 
+                id: "preview", 
+                name, 
+                status: "draft", 
+                fields, 
+                style, 
+                created_at: "", 
+                submissions_count: 0, 
+                conversions_count: 0 
+              }} />
             </div>
           </div>
         </div>
@@ -321,28 +358,104 @@ function FormBuilderDialog({
 }
 
 const EmbedForms = () => {
-  const [forms, setForms] = useState<EmbedForm[]>(mockForms);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleSaveForm = (form: EmbedForm) => {
-    setForms((prev) => {
-      const exists = prev.find((f) => f.id === form.id);
-      if (exists) return prev.map((f) => (f.id === form.id ? form : f));
-      return [...prev, form];
-    });
-    toast({ title: "Formulaire enregistré" });
+  const { data: forms = [], isLoading } = useQuery({
+    queryKey: ['embed-forms', user?.store_id],
+    queryFn: async () => {
+      if (!user?.store_id) return [];
+      const { data, error } = await supabase
+        .from('embed_forms')
+        .select('*')
+        .eq('store_id', user.store_id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(form => ({
+        ...form,
+        fields: form.fields as unknown as FormField[],
+        style: form.style as unknown as FormStyle
+      })) as EmbedForm[];
+    },
+    enabled: !!user?.store_id
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (form: Partial<EmbedForm>) => {
+      if (!user?.store_id) throw new Error("No store ID");
+      const { error } = await supabase
+        .from('embed_forms')
+        .insert({
+          store_id: user.store_id,
+          name: form.name!,
+          fields: form.fields as any,
+          style: form.style as any,
+          status: 'draft'
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
+      toast({ title: "Formulaire créé" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (form: Partial<EmbedForm>) => {
+      if (!form.id) throw new Error("No form ID");
+      const { error } = await supabase
+        .from('embed_forms')
+        .update({
+          name: form.name,
+          fields: form.fields as any,
+          style: form.style as any,
+          status: form.status
+        })
+        .eq('id', form.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
+      toast({ title: "Formulaire mis à jour" });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('embed_forms')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['embed-forms'] });
+      toast({ title: "Formulaire supprimé" });
+    }
+  });
+
+  const handleSaveForm = (form: Partial<EmbedForm>) => {
+    if (form.id) {
+      updateMutation.mutate(form);
+    } else {
+      createMutation.mutate(form);
+    }
   };
 
   const handleDelete = (id: string) => {
-    setForms((prev) => prev.filter((f) => f.id !== id));
-    toast({ title: "Formulaire supprimé" });
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce formulaire ?")) {
+      deleteMutation.mutate(id);
+    }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setForms((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, status: f.status === "active" ? "draft" : "active" } : f))
-    );
+  const handleToggleStatus = (form: EmbedForm) => {
+    updateMutation.mutate({
+      id: form.id,
+      status: form.status === "active" ? "draft" : "active"
+    });
   };
 
   const copyCode = (form: EmbedForm, type: "html" | "wordpress" | "elementor") => {
@@ -352,6 +465,16 @@ const EmbedForms = () => {
     setTimeout(() => setCopiedId(null), 2000);
     toast({ title: "Code copié !" });
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Formulaires embarqués">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Formulaires embarqués">
@@ -367,15 +490,15 @@ const EmbedForms = () => {
           <Card>
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Total soumissions</p>
-              <p className="text-2xl font-bold font-[Space_Grotesk]">{forms.reduce((s, f) => s + f.submissions, 0)}</p>
+              <p className="text-2xl font-bold font-[Space_Grotesk]">{forms.reduce((s, f) => s + (f.submissions_count || 0), 0)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Taux de conversion</p>
               <p className="text-2xl font-bold font-[Space_Grotesk]">
-                {forms.reduce((s, f) => s + f.submissions, 0) > 0
-                  ? `${Math.round((forms.reduce((s, f) => s + f.conversions, 0) / forms.reduce((s, f) => s + f.submissions, 0)) * 100)}%`
+                {forms.reduce((s, f) => s + (f.submissions_count || 0), 0) > 0
+                  ? `${Math.round((forms.reduce((s, f) => s + (f.conversions_count || 0), 0) / forms.reduce((s, f) => s + (f.submissions_count || 0), 0)) * 100)}%`
                   : "—"}
               </p>
             </CardContent>
@@ -410,7 +533,7 @@ const EmbedForms = () => {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={form.status === "active"}
-                      onCheckedChange={() => handleToggleStatus(form.id)}
+                      onCheckedChange={() => handleToggleStatus(form)}
                     />
                     <FormBuilderDialog
                       form={form}
@@ -429,9 +552,9 @@ const EmbedForms = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4">
-                  <span><BarChart3 size={14} className="inline mr-1" />{form.submissions} soumissions</span>
-                  <span><Check size={14} className="inline mr-1" />{form.conversions} conversions</span>
-                  <span>Créé le {form.createdAt}</span>
+                  <span><BarChart3 size={14} className="inline mr-1" />{form.submissions_count || 0} soumissions</span>
+                  <span><Check size={14} className="inline mr-1" />{form.conversions_count || 0} conversions</span>
+                  <span>Créé le {new Date(form.created_at).toLocaleDateString()}</span>
                 </div>
 
                 <Tabs defaultValue="html" className="w-full">
