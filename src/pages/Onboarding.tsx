@@ -58,10 +58,10 @@ const Onboarding = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xs font-[Space_Grotesk]">EF</span>
+              <span className="text-primary-foreground font-bold text-xs font-[Space_Grotesk]">IM</span>
             </div>
             <span className="font-bold font-[Space_Grotesk] text-foreground">
-              Easy<span className="text-primary">Flow</span>
+              Intra<span className="text-primary">mate</span>
             </span>
           </Link>
           <div className="flex items-center gap-3">
