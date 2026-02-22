@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +19,9 @@ import {
 import { getModuleById } from "@/lib/modules-registry";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Bell, CreditCard, Palette, Globe, Shield, Save, Upload,
   Zap, Download, Trash2, Plus, Smartphone, Wallet,
@@ -26,16 +29,56 @@ import {
 
 /* ───── General Tab ───── */
 function GeneralTab() {
-  const [shopName, setShopName] = useState("Ma Boutique");
-  const [email, setEmail] = useState("contact@maboutique.com");
-  const [phone, setPhone] = useState("+225 07 00 00 00");
-  const [currency, setCurrency] = useState("XOF");
-  const [timezone, setTimezone] = useState("Africa/Abidjan");
-  const [language, setLanguage] = useState("fr");
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const storeId = user?.store_id;
 
-  const handleSave = () => {
-    toast({ title: "Paramètres enregistrés", description: "Vos informations ont été mises à jour." });
-  };
+  const { data: store, isLoading } = useQuery({
+    queryKey: ["store-settings", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("id", storeId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [shopName, setShopName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+
+  useEffect(() => {
+    if (store) {
+      setShopName(store.name || "");
+      setEmail(store.email || "");
+      setPhone(store.phone || "");
+      setAddress(store.address || "");
+    }
+  }, [store]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("stores")
+        .update({ name: shopName, email, phone, address })
+        .eq("id", storeId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["store-settings"] });
+      toast({ title: "Paramètres enregistrés", description: "Vos informations ont été mises à jour." });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground py-8 text-center">Chargement...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -63,10 +106,8 @@ function GeneralTab() {
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Logo</Label>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Upload size={16} /> Importer un logo
-              </Button>
+              <Label htmlFor="address">Adresse</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
           </div>
         </CardContent>
@@ -85,7 +126,7 @@ function GeneralTab() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Devise</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select defaultValue="XOF">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="XOF">FCFA (XOF)</SelectItem>
@@ -99,7 +140,7 @@ function GeneralTab() {
             </div>
             <div className="space-y-2">
               <Label>Fuseau horaire</Label>
-              <Select value={timezone} onValueChange={setTimezone}>
+              <Select defaultValue="Africa/Abidjan">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Africa/Abidjan">Abidjan (GMT+0)</SelectItem>
@@ -112,7 +153,7 @@ function GeneralTab() {
             </div>
             <div className="space-y-2">
               <Label>Langue</Label>
-              <Select value={language} onValueChange={setLanguage}>
+              <Select defaultValue="fr">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fr">Français</SelectItem>
@@ -126,7 +167,9 @@ function GeneralTab() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="gap-2"><Save size={16} /> Enregistrer</Button>
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+          <Save size={16} /> {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+        </Button>
       </div>
     </div>
   );
@@ -155,11 +198,10 @@ function NotificationsTab() {
           <CardDescription>Choisissez les événements qui déclenchent une notification.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {[
-            { label: "Nouvelle commande reçue", desc: "Alerte immédiate à chaque nouvelle commande", state: notifNewOrder, set: setNotifNewOrder },
-            { label: "Changement de statut", desc: "Quand une commande avance dans le pipeline", state: notifOrderStatus, set: setNotifOrderStatus },
-            { label: "Stock faible", desc: "Quand un produit passe sous le seuil d'alerte", state: notifLowStock, set: setNotifLowStock },
-            { label: "Activité équipe", desc: "Actions importantes des membres de l'équipe", state: notifTeam, set: setNotifTeam },
+          {[{ label: "Nouvelle commande reçue", desc: "Alerte immédiate à chaque nouvelle commande", state: notifNewOrder, set: setNotifNewOrder },
+          { label: "Changement de statut", desc: "Quand une commande avance dans le pipeline", state: notifOrderStatus, set: setNotifOrderStatus },
+          { label: "Stock faible", desc: "Quand un produit passe sous le seuil d'alerte", state: notifLowStock, set: setNotifLowStock },
+          { label: "Activité équipe", desc: "Actions importantes des membres de l'équipe", state: notifTeam, set: setNotifTeam },
           ].map((item) => (
             <div key={item.label} className="flex items-center justify-between">
               <div>
@@ -216,7 +258,7 @@ function BillingTab() {
   };
 
   const handleAddPayment = () => {
-    toast({ title: "Bientôt disponible", description: "L'ajout de moyens de paiement sera disponible avec Lovable Cloud." });
+    toast({ title: "Bientôt disponible", description: "L'ajout de moyens de paiement sera disponible prochainement." });
   };
 
   const paymentIcon = (type: string) => {
@@ -378,6 +420,7 @@ function BillingTab() {
     </div>
   );
 }
+
 /* ───── Appearance Tab ───── */
 function AppearanceTab() {
   const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
@@ -417,11 +460,8 @@ function AppearanceTab() {
               <button
                 key={t.value}
                 onClick={() => applyTheme(t.value)}
-                className={`rounded-lg border-2 p-4 text-center transition-all ${
-                  theme === t.value
-                    ? "border-primary ring-2 ring-primary/20"
-                    : "border-border hover:border-muted-foreground/30"
-                }`}
+                className={`rounded-lg border-2 p-4 text-center transition-all ${theme === t.value ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/30"
+                  }`}
               >
                 <div className={`h-12 rounded-md mb-2 ${t.preview}`} />
                 <span className="text-sm font-medium text-foreground">{t.label}</span>
