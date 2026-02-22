@@ -563,6 +563,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string | null
+          facebook_id: string | null
           id: string
           name: string
           phone: string | null
@@ -574,6 +575,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          facebook_id?: string | null
           id?: string
           name: string
           phone?: string | null
@@ -585,6 +587,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
+          facebook_id?: string | null
           id?: string
           name?: string
           phone?: string | null
