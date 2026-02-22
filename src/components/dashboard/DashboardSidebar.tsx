@@ -123,7 +123,7 @@ function UserProfile() {
           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
         </div>
         <button
-          onClick={() => { logout(); navigate("/"); }}
+          onClick={async () => { await logout(); navigate("/"); }}
           className="text-muted-foreground hover:text-foreground transition-colors"
           title="Se déconnecter"
         >
