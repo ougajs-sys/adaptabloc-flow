@@ -26,6 +26,8 @@ import Help from "./pages/Help";
 import Campaigns from "./pages/Campaigns";
 import EmbedForms from "./pages/EmbedForms";
 import EmbedOrder from "./pages/EmbedOrder";
+import SetupAdmin from "./pages/SetupAdmin";
+import SuperAdmin from "./pages/SuperAdmin";
 import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
@@ -62,6 +64,8 @@ const AppRoutes = () => (
     <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute><PreparateurWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
     <Route path="/embed/order" element={<EmbedOrder />} />
+    <Route path="/setup-admin" element={<SetupAdmin />} />
+    <Route path="/super-admin" element={<SuperAdmin />} />
     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
     <Route path="*" element={<NotFound />} />
   </Routes>

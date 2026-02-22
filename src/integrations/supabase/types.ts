@@ -455,6 +455,48 @@ export type Database = {
           },
         ]
       }
+      payment_providers: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          display_name: string
+          fee_percentage: number
+          id: string
+          is_active: boolean
+          markets: string[]
+          name: string
+          secret_key: string | null
+          supported_methods: string[]
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          display_name: string
+          fee_percentage?: number
+          id?: string
+          is_active?: boolean
+          markets?: string[]
+          name: string
+          secret_key?: string | null
+          supported_methods?: string[]
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          display_name?: string
+          fee_percentage?: number
+          id?: string
+          is_active?: boolean
+          markets?: string[]
+          name?: string
+          secret_key?: string | null
+          supported_methods?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_variants: {
         Row: {
           attributes: Json | null
@@ -637,6 +679,7 @@ export type Database = {
       stores: {
         Row: {
           address: string | null
+          country: string | null
           created_at: string
           email: string | null
           id: string
@@ -649,6 +692,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -661,6 +705,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -672,6 +717,62 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          country: string | null
+          created_at: string
+          currency: string
+          grace_until: string | null
+          id: string
+          modules: string[]
+          provider: string | null
+          renewal_date: string | null
+          started_at: string
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          country?: string | null
+          created_at?: string
+          currency?: string
+          grace_until?: string | null
+          id?: string
+          modules?: string[]
+          provider?: string | null
+          renewal_date?: string | null
+          started_at?: string
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          country?: string | null
+          created_at?: string
+          currency?: string
+          grace_until?: string | null
+          id?: string
+          modules?: string[]
+          provider?: string | null
+          renewal_date?: string | null
+          started_at?: string
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_invitations: {
         Row: {
@@ -710,6 +811,66 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          country: string | null
+          created_at: string
+          currency: string
+          fee_amount: number
+          gross_amount: number
+          id: string
+          net_amount: number
+          provider: string
+          provider_reference: string | null
+          status: string
+          store_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          currency?: string
+          fee_amount?: number
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          provider: string
+          provider_reference?: string | null
+          status?: string
+          store_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          currency?: string
+          fee_amount?: number
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          provider?: string
+          provider_reference?: string | null
+          status?: string
+          store_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -763,7 +924,7 @@ export type Database = {
       is_store_owner: { Args: { _store_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "caller" | "preparer" | "driver"
+      app_role: "admin" | "caller" | "preparer" | "driver" | "superadmin"
       campaign_status: "draft" | "scheduled" | "sent" | "cancelled"
       campaign_type: "sms" | "whatsapp" | "email"
       delivery_status:
@@ -913,7 +1074,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "caller", "preparer", "driver"],
+      app_role: ["admin", "caller", "preparer", "driver", "superadmin"],
       campaign_status: ["draft", "scheduled", "sent", "cancelled"],
       campaign_type: ["sms", "whatsapp", "email"],
       delivery_status: [
