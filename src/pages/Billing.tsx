@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { PaymentCheckout } from "@/components/billing/PaymentCheckout";
 
 const Billing = () => {
   const { activeModules, monthlyPrice } = useModules();
@@ -45,6 +46,9 @@ const Billing = () => {
   return (
     <DashboardLayout title="Facturation">
       <div className="space-y-8">
+        {/* Payment checkout */}
+        <PaymentCheckout />
+
         {/* Summary card */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
