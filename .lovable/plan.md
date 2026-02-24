@@ -1,76 +1,86 @@
 
-# Corriger le systeme d'invitation par email
 
-## Probleme 1 : Aucun email d'invitation n'est envoye
+# Plan d'implementation MVP -- Phase 1 + Protection des modules
 
-Actuellement, cliquer "Inviter" insere simplement une ligne dans la table `team_invitations`. Personne ne recoit de notification.
+## Vue d'ensemble
 
-### Solution : Creer une Edge Function `send-invitation`
-
-Cette fonction sera appelee apres l'insertion de l'invitation et enverra un email via le service d'email integre de Lovable Cloud (Supabase Auth Admin).
-
-**Flux :**
-1. L'admin clique "Inviter" dans l'interface
-2. L'invitation est inseree dans `team_invitations` (existant)
-3. Le client appelle la nouvelle Edge Function `send-invitation` avec l'email, le role et le nom de la boutique
-4. L'Edge Function utilise l'API Admin pour generer un lien d'inscription magique (invite link)
-5. Le collaborateur recoit un email avec un lien pour rejoindre l'equipe
-
-**Fichiers a creer :**
-- `supabase/functions/send-invitation/index.ts` : Edge Function qui genere et envoie le lien d'invitation via `supabase.auth.admin.inviteUserByEmail()` ou `generateLink()`
-
-**Fichiers a modifier :**
-- `src/pages/Team.tsx` : Modifier `inviteMutation` pour appeler l'Edge Function apres l'insertion dans `team_invitations`
+Ce plan couvre 3 axes :
+1. Corriger les 3 erreurs de build TypeScript
+2. Connecter les donnees reelles (totalOrders/totalSpent des clients, decompte stock)
+3. Marquer les modules non fonctionnels comme "Bientot disponible" pour empecher leur achat
 
 ---
 
-## Probleme 2 : Erreur 400 sur la page Equipe
+## 1. Corriger les erreurs de build (3 fichiers)
 
-La requete `user_roles.select("..., profiles!inner(...)")` echoue car il n'y a pas de foreign key entre `user_roles` et `profiles`. Les deux tables ont chacune un `user_id` vers `auth.users`, mais PostgREST ne peut pas deviner la relation.
-
-### Solution : Modifier la requete pour faire deux appels separes
-
-Au lieu d'un JOIN PostgREST impossible, la page Equipe fera :
-1. Une requete sur `user_roles` pour obtenir les roles (user_id, role)
-2. Une requete sur `profiles` pour obtenir les infos (user_id, name, email, phone, avatar_url)
-3. Un merge cote client par `user_id`
-
-**Fichier a modifier :**
-- `src/pages/Team.tsx` : Remplacer la requete unique avec JOIN par deux requetes separees + merge
+**Fichiers concernes :**
+- `supabase/functions/facebook-auth/index.ts` -- ligne 151 : `(err as Error).message`
+- `supabase/functions/send-invitation/index.ts` -- ligne 82 : `(err as Error).message`
+- `supabase/functions/submit-form/index.ts` -- ligne 185 : `(error as Error).message`
 
 ---
 
-## Detail technique
+## 2. Calculer totalOrders et totalSpent reels dans Customers
 
-### Edge Function `send-invitation`
+**Fichier :** `src/pages/Customers.tsx`
 
-```text
-POST /send-invitation
-Body: { store_id, email, role, store_name }
+Actuellement, `totalOrders` et `totalSpent` sont codes en dur a `0` (lignes 81-82). La solution :
+- Apres avoir recupere les clients, faire une requete sur `orders` filtree par `store_id`
+- Grouper cote client par `customer_id` pour calculer le nombre de commandes et la somme des `total_amount`
+- Recuperer la date de la derniere commande pour `lastOrder`
 
-1. Verifie que l'appelant est admin du store (via JWT)
-2. Utilise supabase.auth.admin.inviteUserByEmail(email, { redirectTo: origin + "/login" })
-   - Cela envoie automatiquement un email d'invitation via Lovable Cloud
-3. Retourne { success: true }
-```
+---
 
-L'email contient un lien. Quand l'invite clique dessus et s'inscrit, le trigger existant `handle_invited_user` prend le relais automatiquement pour assigner le role et creer le profil.
+## 3. Decompte automatique du stock a la creation de commande
 
-### Correction de la requete Team members
+**Fichier :** `src/pages/Orders.tsx`
 
-```text
-Avant (echoue) :
-  user_roles.select("id, user_id, role, profiles!inner(name, email, phone, avatar_url)")
+Dans `handleNewOrder`, apres l'insertion des `order_items`, pour chaque article qui a un `product_id` :
+- Lire le stock actuel du produit
+- Soustraire la quantite commandee
+- Mettre a jour le stock via `supabase.from("products").update({ stock })`
 
-Apres (fonctionne) :
-  1. user_roles.select("id, user_id, role").eq("store_id", storeId)
-  2. profiles.select("user_id, name, email, phone, avatar_url").eq("store_id", storeId)
-  3. Merge cote client par user_id
-```
+Cela necessite que les items du formulaire de commande referencent un `product_id`. Verification du `NewOrderDialog` pour confirmer si c'est deja le cas.
 
-### Ordre d'implementation
+---
 
-1. Migration DB : aucune necessaire (les tables existent deja)
-2. Creer l'Edge Function `send-invitation`
-3. Corriger la requete dans `Team.tsx` (deux requetes separees)
-4. Modifier `inviteMutation` pour appeler l'Edge Function apres l'insertion
+## 4. Marquer les modules non fonctionnels comme "Bientot disponible"
+
+**Fichier :** `src/lib/modules-registry.ts`
+- Ajouter un champ `available: boolean` a l'interface `ModuleDefinition`
+- Marquer `available: true` pour les modules fonctionnels :
+  - Tous les modules gratuits (dashboard, orders_basic, customers_basic, delivery_basic, team_basic)
+  - extra_callers, extra_preparers, extra_drivers
+  - campaigns
+  - embed_forms
+  - customer_history (une fois les stats reelles branchees)
+  - export (sera implemente en Phase 2)
+- Marquer `available: false` pour les modules non implementes :
+  - custom_fields, custom_status, message_templates
+  - stock_auto, multi_delivery, call_center, warehouse_team
+  - segmentation, loyalty
+  - geo_tracking, automations, api, multi_store, ai_assistant
+
+**Fichier :** `src/components/modules/ModuleCard.tsx`
+- Si `module.available === false` : afficher un badge "Bientot disponible", desactiver le switch, griser la carte
+
+**Fichier :** `src/components/billing/PaymentCheckout.tsx`
+- Filtrer les modules non disponibles pour empecher leur inclusion dans le panier de paiement
+
+---
+
+## Resume des fichiers modifies
+
+| Fichier | Modification |
+|---------|-------------|
+| `supabase/functions/facebook-auth/index.ts` | Cast err as Error |
+| `supabase/functions/send-invitation/index.ts` | Cast err as Error |
+| `supabase/functions/submit-form/index.ts` | Cast error as Error |
+| `src/pages/Customers.tsx` | Requete orders pour totalOrders/totalSpent reels |
+| `src/pages/Orders.tsx` | Decompte stock auto apres creation commande |
+| `src/lib/modules-registry.ts` | Ajouter champ `available` a chaque module |
+| `src/components/modules/ModuleCard.tsx` | UI "Bientot disponible" + switch desactive |
+| `src/components/billing/PaymentCheckout.tsx` | Filtrer modules non disponibles |
+
+Aucune migration de base de donnees n'est necessaire pour cette phase.
+
