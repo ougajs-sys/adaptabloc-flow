@@ -49,6 +49,7 @@ export const Footer = () => {
             <ul className="space-y-2">
               <li><Link to="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Support</Link></li>
               <li><Link to="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">contact@intramate.app</Link></li>
+              <li><Link to="/admin/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Espace administration</Link></li>
             </ul>
           </div>
         </div>

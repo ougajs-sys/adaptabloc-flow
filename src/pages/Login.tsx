@@ -239,6 +239,13 @@ const Login = () => {
           En continuant, vous acceptez les{" "}
           <span className="underline cursor-pointer">conditions d'utilisation</span>
         </p>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          Vous faites partie de l'équipe Intramate ?{" "}
+          <Link to="/admin/login" className="text-primary hover:underline font-medium">
+            Accéder à l'espace admin
+          </Link>
+        </p>
       </motion.div>
     </div>
   );

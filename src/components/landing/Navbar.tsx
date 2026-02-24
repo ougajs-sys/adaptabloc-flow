@@ -51,6 +51,9 @@ export const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
+          <Link to="/admin/login" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            Accès équipe
+          </Link>
           <Button variant="ghost" asChild>
             <Link to="/login">Se connecter</Link>
           </Button>
@@ -93,6 +96,9 @@ export const Navbar = () => {
                 <Button asChild className="text-white border-0" style={{ backgroundColor: "#1877F2" }}>
                   <Link to="/login">Commencer avec Facebook</Link>
                 </Button>
+                <Link to="/admin/login" className="text-xs text-center text-muted-foreground hover:text-foreground transition-colors pt-1">
+                  Accès équipe →
+                </Link>
               </div>
             </div>
           </motion.div>
