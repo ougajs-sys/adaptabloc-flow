@@ -78,6 +78,11 @@ const AppRoutes = () => (
     <Route path="/embed/order" element={<EmbedOrder />} />
     <Route path="/setup-admin" element={<SetupAdmin />} />
 
+    {/* Admin HQ - aliases */}
+    <Route path="/admin-login" element={<Navigate to="/admin/login" replace />} />
+    <Route path="/hq/login" element={<Navigate to="/admin/login" replace />} />
+    <Route path="/hq" element={<Navigate to="/admin/login" replace />} />
+
     {/* Admin HQ - login is standalone */}
     <Route path="/admin/login" element={<AdminLogin />} />
     {/* Admin HQ - workspace with layout */}
