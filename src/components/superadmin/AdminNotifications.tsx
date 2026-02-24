@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
@@ -34,10 +35,27 @@ export default function AdminNotifications() {
   const [open, setOpen] = useState(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
 
-  const addNotification = useCallback((n: Omit<Notification, "read">) => {
+  const addNotification = useCallback((n: Omit<Notification, "read">, isRealtime = false) => {
     if (seenIdsRef.current.has(n.id)) return;
     seenIdsRef.current.add(n.id);
     setNotifications((prev) => [{ ...n, read: false }, ...prev].slice(0, 50));
+
+    if (isRealtime) {
+      // Play notification sound
+      try {
+        const audio = new Audio("data:audio/wav;base64,UklGRlIGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YS4GAAB/f39/f39/f4CAgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/v///////v79/Pv6+fj39vX08/Lx8O/u7ezr6uno5+bl5OPi4eDf3t3c29rZ2NfW1dTT0tHQz87NzMvKycjHxsXEw8LBwL++vby7urm4t7a1tLOysbCvrq2sq6qpqKempaSjoqGgn56dnJuamZiXlpWUk5KRkI+OjYyLiomIh4aFhIOCgYB/f39/f39/fw==");
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      } catch {}
+
+      // Show toast
+      const EMOJI_MAP = { store: "🏪", payment: "💰", ticket: "🎫" };
+      toast(n.title, {
+        description: n.description,
+        icon: EMOJI_MAP[n.type],
+        duration: 5000,
+      });
+    }
   }, []);
 
   // Load recent events on mount
@@ -85,23 +103,23 @@ export default function AdminNotifications() {
       .channel("admin-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "stores" }, (payload) => {
         const s = payload.new as any;
-        addNotification({ id: `store-${s.id}`, type: "store", title: "Nouvelle boutique", description: s.name, time: s.created_at });
+        addNotification({ id: `store-${s.id}`, type: "store", title: "Nouvelle boutique", description: s.name, time: s.created_at }, true);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "transactions" }, (payload) => {
         const t = payload.new as any;
         if (t.status === "completed") {
-          addNotification({ id: `txn-${t.id}`, type: "payment", title: "Paiement confirmé", description: `${t.gross_amount?.toLocaleString()} ${t.currency}`, time: t.created_at });
+          addNotification({ id: `txn-${t.id}`, type: "payment", title: "Paiement confirmé", description: `${t.gross_amount?.toLocaleString()} ${t.currency}`, time: t.created_at }, true);
         }
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "transactions" }, (payload) => {
         const t = payload.new as any;
         if (t.status === "completed") {
-          addNotification({ id: `txn-${t.id}`, type: "payment", title: "Paiement reçu", description: `${t.gross_amount?.toLocaleString()} ${t.currency}`, time: t.created_at });
+          addNotification({ id: `txn-${t.id}`, type: "payment", title: "Paiement reçu", description: `${t.gross_amount?.toLocaleString()} ${t.currency}`, time: t.created_at }, true);
         }
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_tickets" }, (payload) => {
         const t = payload.new as any;
-        addNotification({ id: `ticket-${t.id}`, type: "ticket", title: "Nouveau ticket", description: t.subject, time: t.created_at });
+        addNotification({ id: `ticket-${t.id}`, type: "ticket", title: "Nouveau ticket", description: t.subject, time: t.created_at }, true);
       })
       .subscribe();
 
