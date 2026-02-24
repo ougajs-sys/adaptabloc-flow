@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { usePagination } from "@/hooks/usePagination";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -168,6 +170,9 @@ const Customers = () => {
     return matchSearch && matchSegment;
   });
 
+  const PAGE_SIZE = 20;
+  const { page, totalPages, paginated: paginatedCustomers, next, prev, goTo, total: filteredTotal } = usePagination(filtered, PAGE_SIZE);
+
   const totalRevenue = customers.reduce((s, c) => s + c.totalSpent, 0);
   const totalOrders = customers.reduce((s, c) => s + c.totalOrders, 0);
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
@@ -271,7 +276,7 @@ const Customers = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((customer) => {
+                {paginatedCustomers.map((customer) => {
                   const seg = segmentConfig[customer.segment] || segmentConfig.standard;
                   const initials = customer.name.split(" ").map((n) => n[0]).join("");
                   return (
@@ -295,6 +300,7 @@ const Customers = () => {
                 })}
               </TableBody>
             </Table>
+            <DataPagination page={page} totalPages={totalPages} total={filteredTotal} pageSize={PAGE_SIZE} onPrev={prev} onNext={next} onGoTo={goTo} />
           </CardContent>
         </Card>
       )}
