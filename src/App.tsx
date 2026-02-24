@@ -38,6 +38,7 @@ import SuperAdminAnalytics from "./components/superadmin/SuperAdminAnalytics";
 import SuperAdminProviders from "./components/superadmin/SuperAdminProviders";
 import SuperAdminActivity from "./components/superadmin/SuperAdminActivity";
 import SuperAdminTeam from "./components/superadmin/SuperAdminTeam";
+import SuperAdminTickets from "./components/superadmin/SuperAdminTickets";
 import SuperAdminConfig from "./components/superadmin/SuperAdminConfig";
 import type { ReactNode } from "react";
 
@@ -90,6 +91,7 @@ const AppRoutes = () => (
       <Route path="analytics" element={<SuperAdminAnalytics />} />
       <Route path="providers" element={<SuperAdminProviders />} />
       <Route path="activity" element={<SuperAdminActivity />} />
+      <Route path="tickets" element={<SuperAdminTickets />} />
       <Route path="team" element={<SuperAdminTeam />} />
       <Route path="config" element={<SuperAdminConfig />} />
     </Route>
