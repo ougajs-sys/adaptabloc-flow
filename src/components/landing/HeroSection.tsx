@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Zap, Shield, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import { modulesRegistry } from "@/lib/modules-registry";
 import { FloatingBrick } from "./FloatingBrick";
 
@@ -12,17 +11,6 @@ const heroModules = modulesRegistry.filter(m =>
 );
 
 export const HeroSection = () => {
-  const { signInWithFacebook } = useAuth();
-  const { toast } = useToast();
-
-  const handleFacebookSignIn = async () => {
-    try {
-      await signInWithFacebook();
-    } catch (err: any) {
-      toast({ title: "Erreur Facebook", description: err.message, variant: "destructive" });
-    }
-  };
-
   return (
     <section className="relative pt-28 pb-20 overflow-hidden min-h-[90vh] flex items-center">
       {/* Premium gradient background */}
@@ -62,12 +50,14 @@ export const HeroSection = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
               <Button
                 size="lg"
-                onClick={handleFacebookSignIn}
+                asChild
                 className="text-base px-8 h-12 text-white border-0 backdrop-blur-sm shadow-lg shadow-[#1877F2]/25"
                 style={{ backgroundColor: "#1877F2" }}
               >
-                <svg className="mr-2" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                Commencer avec Facebook
+                <Link to="/login" className="flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  Commencer avec Facebook
+                </Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="text-base px-8 h-12 backdrop-blur-sm bg-card/50 border-border/50">
                 <a href="#how-it-works">Voir la démo</a>
