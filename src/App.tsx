@@ -45,12 +45,15 @@ import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
+function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user?.has_completed_onboarding) return <Navigate to="/onboarding" replace />;
+  if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 }
@@ -65,17 +68,17 @@ const AppRoutes = () => (
     <Route path="/dashboard/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
     <Route path="/dashboard/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
     <Route path="/dashboard/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
-    <Route path="/dashboard/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
-    <Route path="/dashboard/modules" element={<ProtectedRoute><ModulesManagement /></ProtectedRoute>} />
-    <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-    <Route path="/dashboard/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+    <Route path="/dashboard/team" element={<ProtectedRoute allowedRoles={["admin"]}><Team /></ProtectedRoute>} />
+    <Route path="/dashboard/modules" element={<ProtectedRoute allowedRoles={["admin"]}><ModulesManagement /></ProtectedRoute>} />
+    <Route path="/dashboard/settings" element={<ProtectedRoute allowedRoles={["admin"]}><Settings /></ProtectedRoute>} />
+    <Route path="/dashboard/billing" element={<ProtectedRoute allowedRoles={["admin"]}><Billing /></ProtectedRoute>} />
     <Route path="/dashboard/stats" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
     <Route path="/dashboard/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
-    <Route path="/dashboard/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
-    <Route path="/dashboard/forms" element={<ProtectedRoute><EmbedForms /></ProtectedRoute>} />
-    <Route path="/dashboard/workspace/caller" element={<ProtectedRoute><CallerWorkspace /></ProtectedRoute>} />
-    <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute><PreparateurWorkspace /></ProtectedRoute>} />
-    <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
+    <Route path="/dashboard/campaigns" element={<ProtectedRoute allowedRoles={["admin"]}><Campaigns /></ProtectedRoute>} />
+    <Route path="/dashboard/forms" element={<ProtectedRoute allowedRoles={["admin"]}><EmbedForms /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/caller" element={<ProtectedRoute allowedRoles={["admin", "caller"]}><CallerWorkspace /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><PreparateurWorkspace /></ProtectedRoute>} />
+    <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute allowedRoles={["admin", "driver"]}><LivreurWorkspace /></ProtectedRoute>} />
     <Route path="/embed/order" element={<EmbedOrder />} />
     <Route path="/setup-admin" element={<SetupAdmin />} />
 

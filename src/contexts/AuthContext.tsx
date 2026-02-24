@@ -11,6 +11,7 @@ export interface AppUser {
   avatar_url: string;
   has_completed_onboarding: boolean;
   store_id: string | null;
+  role: string | null;
 }
 
 interface AuthContextValue {
@@ -32,11 +33,12 @@ async function buildAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
   // Check if user has a store (via user_roles)
   const { data: roles } = await supabase
     .from("user_roles")
-    .select("store_id")
+    .select("store_id, role")
     .eq("user_id", supabaseUser.id)
     .limit(1);
 
   const storeId = roles && roles.length > 0 ? roles[0].store_id : null;
+  const role = roles && roles.length > 0 ? roles[0].role : null;
 
   // Check profile
   let name = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User";
@@ -63,6 +65,7 @@ async function buildAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
     avatar_url: avatarUrl,
     has_completed_onboarding: !!storeId,
     store_id: storeId,
+    role,
   };
 }
 

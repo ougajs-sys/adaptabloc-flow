@@ -41,6 +41,8 @@ interface SidebarItem {
   icon: typeof LayoutDashboard;
   /** Module ID required to unlock this item. undefined = always visible */
   requiredModule?: string;
+  /** Roles allowed to see this item. undefined = all roles */
+  requiredRoles?: string[];
 }
 
 const mainItems: SidebarItem[] = [
@@ -49,31 +51,37 @@ const mainItems: SidebarItem[] = [
   { title: "Clients", url: "/dashboard/customers", icon: Users },
   { title: "Produits", url: "/dashboard/products", icon: Package },
   { title: "Livraisons", url: "/dashboard/deliveries", icon: Truck },
-  { title: "Équipe", url: "/dashboard/team", icon: UsersRound },
+  { title: "Équipe", url: "/dashboard/team", icon: UsersRound, requiredRoles: ["admin"] },
 ];
 
 const workspaceItems: SidebarItem[] = [
-  { title: "Espace Caller", url: "/dashboard/workspace/caller", icon: Phone },
-  { title: "Espace Préparateur", url: "/dashboard/workspace/preparateur", icon: PackageCheck },
-  { title: "Espace Livreur", url: "/dashboard/workspace/livreur", icon: Truck },
+  { title: "Espace Caller", url: "/dashboard/workspace/caller", icon: Phone, requiredRoles: ["admin", "caller"] },
+  { title: "Espace Préparateur", url: "/dashboard/workspace/preparateur", icon: PackageCheck, requiredRoles: ["admin", "preparer"] },
+  { title: "Espace Livreur", url: "/dashboard/workspace/livreur", icon: Truck, requiredRoles: ["admin", "driver"] },
 ];
 
 const toolItems: SidebarItem[] = [
   { title: "Statistiques", url: "/dashboard/stats", icon: BarChart3 },
-  { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns" },
-  { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredModule: "embed_forms" },
+  { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns", requiredRoles: ["admin"] },
+  { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredModule: "embed_forms", requiredRoles: ["admin"] },
 ];
 
 const bottomItems: SidebarItem[] = [
-  { title: "Modules", url: "/dashboard/modules", icon: Boxes },
-  { title: "Abonnement", url: "/dashboard/billing", icon: CreditCard },
-  { title: "Paramètres", url: "/dashboard/settings", icon: Settings },
+  { title: "Modules", url: "/dashboard/modules", icon: Boxes, requiredRoles: ["admin"] },
+  { title: "Abonnement", url: "/dashboard/billing", icon: CreditCard, requiredRoles: ["admin"] },
+  { title: "Paramètres", url: "/dashboard/settings", icon: Settings, requiredRoles: ["admin"] },
   { title: "Aide", url: "/dashboard/help", icon: HelpCircle },
 ];
 
 function SidebarNavItem({ item }: { item: SidebarItem }) {
   const { hasModule } = useModules();
+  const { user } = useAuth();
   const locked = item.requiredModule ? !hasModule(item.requiredModule) : false;
+
+  // Hide item if user's role is not in requiredRoles
+  if (item.requiredRoles && user?.role && !item.requiredRoles.includes(user.role)) {
+    return null;
+  }
 
   return (
     <SidebarMenuItem>
