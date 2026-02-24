@@ -774,6 +774,53 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          status: Database["public"]["Enums"]["ticket_status"]
+          store_id: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          status?: Database["public"]["Enums"]["ticket_status"]
+          store_id: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          status?: Database["public"]["Enums"]["ticket_status"]
+          store_id?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invitations: {
         Row: {
           created_at: string | null
@@ -811,6 +858,44 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_comments: {
+        Row: {
+          author_id: string
+          author_name: string
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: string
+        }
+        Insert: {
+          author_id: string
+          author_name: string
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string
+          author_name?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -956,6 +1041,8 @@ export type Database = {
         | "delivered"
         | "returned"
         | "cancelled"
+      ticket_priority: "low" | "medium" | "high"
+      ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1117,6 +1204,8 @@ export const Constants = {
         "returned",
         "cancelled",
       ],
+      ticket_priority: ["low", "medium", "high"],
+      ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
   },
 } as const

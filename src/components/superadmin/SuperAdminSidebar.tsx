@@ -13,6 +13,7 @@ import {
   UsersRound,
   Settings,
   LogOut,
+  Ticket,
 } from "lucide-react";
 import {
   Sidebar,
@@ -53,6 +54,7 @@ const navGroups = [
   {
     label: "Support",
     items: [
+      { title: "Tickets Support", url: "/admin/tickets", icon: Ticket },
       { title: "Journal d'activité", url: "/admin/activity", icon: Activity },
       { title: "Équipe Intramate", url: "/admin/team", icon: UsersRound },
     ],
