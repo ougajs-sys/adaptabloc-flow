@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Ticket,
+  Tags,
 } from "lucide-react";
 import {
   Sidebar,
@@ -42,6 +43,7 @@ const navGroups = [
       { title: "Boutiques", url: "/admin/stores", icon: Store },
       { title: "Utilisateurs", url: "/admin/users", icon: Users },
       { title: "Modules", url: "/admin/modules", icon: Puzzle },
+      { title: "Tarification", url: "/admin/pricing", icon: Tags },
     ],
   },
   {

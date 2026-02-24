@@ -34,6 +34,7 @@ import SuperAdminStores from "./components/superadmin/SuperAdminStores";
 import SuperAdminUsers from "./components/superadmin/SuperAdminUsers";
 import SuperAdminFinances from "./components/superadmin/SuperAdminFinances";
 import SuperAdminModules from "./components/superadmin/SuperAdminModules";
+import SuperAdminPricing from "./components/superadmin/SuperAdminPricing";
 import SuperAdminAnalytics from "./components/superadmin/SuperAdminAnalytics";
 import SuperAdminProviders from "./components/superadmin/SuperAdminProviders";
 import SuperAdminActivity from "./components/superadmin/SuperAdminActivity";
@@ -93,6 +94,7 @@ const AppRoutes = () => (
       <Route path="users" element={<SuperAdminUsers />} />
       <Route path="finances" element={<SuperAdminFinances />} />
       <Route path="modules" element={<SuperAdminModules />} />
+      <Route path="pricing" element={<SuperAdminPricing />} />
       <Route path="analytics" element={<SuperAdminAnalytics />} />
       <Route path="providers" element={<SuperAdminProviders />} />
       <Route path="activity" element={<SuperAdminActivity />} />
