@@ -1,106 +1,167 @@
 
 
-# Redesign Premium de la Page d'Accueil -- Concept "Briques Modulaires"
+# Transformation du Super Admin en Espace de Travail Complet -- Equipe Intramate
 
-## Vision
+## Concept d'acces
 
-Transformer la landing page en une experience visuelle premium qui illustre le concept central d'Intramate : des briques/modules qui s'assemblent comme un puzzle pour creer un systeme sur mesure. L'animation hero montrera les modules flottants qui s'emboitent dynamiquement, evoquant immediatement la modularite et la simplicite.
+L'espace Super Admin sera accessible via une **page de connexion dediee et independante** a l'adresse `/admin`. Cette page est completement separee du login client (`/login`). Seul un formulaire email/mot de passe sera propose (pas de Facebook/Google) pour renforcer la securite. Apres connexion, le systeme verifie le role `superadmin`/`support`/`finance`/`developer` dans la base de donnees. Si le role n'est pas trouve, l'acces est refuse.
 
----
+```text
+Flux d'acces :
 
-## 1. Hero Section -- Animation "Briques qui s'assemblent"
+  /admin  -->  Login email/mdp  -->  Verification role en base  -->  /admin/overview
+                                          |
+                                     Pas de role admin?
+                                          |
+                                     "Acces refuse"
+```
 
-Remplacer le hero actuel par une animation immersive :
-
-- **Fond** : Gradient fluide violet-vers-mint avec particules lumineuses subtiles
-- **Animation centrale** : Une grille de briques/cartes 3D representant les modules (Commandes, Clients, Livraisons, Stock, Campagnes, etc.) qui flottent separement puis s'assemblent progressivement en un tableau de bord unifie
-- **Chaque brique** affiche l'icone + le nom du module avec un leger effet de profondeur (ombre, rotation 3D)
-- **Sequence** : Les briques arrivent en cascade depuis differentes directions, tournent legerement, puis "cliquent" en place comme un puzzle -- evoquant la personnalisation
-- **Texte hero** superpose : "Construisez VOTRE systeme, brique par brique" avec le sous-titre actuel
-- **CTA** : Boutons existants (Facebook + Demo) avec un style glass-morphism premium
-
-**Technologie** : Framer Motion `layout` animations + `variants` pour orchestrer l'assemblement des briques.
+Le lien dans la sidebar du dashboard client sera **supprime** -- l'espace admin est desormais totalement isole.
 
 ---
 
-## 2. Section "Modules Interactifs" (remplace FeaturesSection)
+## Architecture des routes
 
-Une grille interactive de briques modules :
-
-- **Vue grille isometrique** : Les modules sont presentes comme des briques colorees dans une grille
-- **Hover** : Au survol, chaque brique s'eleve avec une ombre portee, revele sa description et pulse avec sa couleur de tier
-- **Couleurs par tier** : Gratuit = vert mint, Tier 1 = violet clair, Tier 2 = violet, Tier 3 = violet fonce/dore
-- **Effet "drag"** visuel : Les briques semblent deplacables (animation subtile de tremblement au hover)
-- **Compteur dynamique** : "22 modules disponibles -- Composez votre systeme ideal"
-
----
-
-## 3. Section "Comment ca marche" -- Timeline Animee
-
-Ameliorer la section existante :
-
-- **Timeline verticale** avec une ligne animee qui se dessine au scroll
-- **Etape 2 revisitee** : Au lieu d'un simple texte, montrer une mini-animation de 3-4 briques qui s'ajoutent a un cadre avec le prix qui se calcule en temps reel
-- **Micro-interactions** : Chaque etape s'anime a l'entree dans le viewport
+```text
+/admin                  -->  Page de login dediee (AdminLogin)
+/admin/overview         -->  Vue Globale enrichie
+/admin/stores           -->  Gestion Boutiques
+/admin/users            -->  NOUVEAU - Tous les utilisateurs
+/admin/finances         -->  Transactions
+/admin/modules          -->  Catalogue modules
+/admin/analytics        -->  Graphiques enrichis
+/admin/providers        -->  Providers Paiement
+/admin/activity         -->  NOUVEAU - Journal d'activite
+/admin/team             -->  NOUVEAU - Equipe interne Intramate
+/admin/config           -->  NOUVEAU - Configuration systeme
+```
 
 ---
 
-## 4. Section "Preuve Sociale / Stats" (nouvelle)
+## Layout de l'espace
 
-Ajouter une section de confiance entre Features et Pricing :
-
-- Compteurs animes (commandes gerees, utilisateurs, pays)
-- Style : grands chiffres en Space Grotesk avec animation de comptage au scroll
+```text
++---------------------------+----------------------------------------+
+|                           |                                        |
+|  SIDEBAR ADMIN            |   CONTENU PRINCIPAL                    |
+|                           |                                        |
+|  [Shield] Intramate HQ    |   Header : titre section + profil      |
+|                           |                                        |
+|  --- Tableau de bord ---  |                                        |
+|  > Vue Globale            |                                        |
+|  > Analytics              |                                        |
+|                           |                                        |
+|  --- Gestion ---          |                                        |
+|  > Boutiques              |                                        |
+|  > Utilisateurs           |                                        |
+|  > Modules                |                                        |
+|                           |                                        |
+|  --- Finances ---         |                                        |
+|  > Transactions           |                                        |
+|  > Providers Paiement     |                                        |
+|                           |                                        |
+|  --- Support ---          |                                        |
+|  > Journal d'activite     |                                        |
+|  > Equipe Intramate       |                                        |
+|                           |                                        |
+|  --- Systeme ---          |                                        |
+|  > Configuration          |                                        |
+|                           |                                        |
+|  [Profil] [Deconnexion]   |                                        |
++---------------------------+----------------------------------------+
+```
 
 ---
 
-## 5. Section Pricing -- Glass-morphism
+## Nouvelles fonctionnalites
 
-Ameliorer le design existant :
+### 1. Page de Login Admin (`/admin`)
+- Design premium avec fond sombre et icone Shield
+- Formulaire email + mot de passe uniquement (pas d'OAuth)
+- Apres connexion, verification du role dans `user_roles`
+- Message d'erreur clair si le compte n'a pas de role admin
+- Redirection vers `/admin/overview` en cas de succes
 
-- Cartes en glass-morphism (fond semi-transparent, blur, bordure lumineuse)
-- Plan populaire avec un halo lumineux anime
-- Les modules inclus dans chaque plan affiches comme des mini-briques colorees
+### 2. Utilisateurs (`SuperAdminUsers.tsx`)
+- Liste globale de tous les profils (table `profiles` + `user_roles`)
+- Colonnes : Nom, Email, Boutique, Role, Date d'inscription
+- Recherche par nom/email
+- Compteur total d'utilisateurs
+
+### 3. Journal d'activite (`SuperAdminActivity.tsx`)
+- Timeline des evenements recents : inscriptions boutiques, activations de modules, transactions
+- Lecture croisee depuis `stores.created_at`, `store_modules.activated_at`, `transactions.created_at`
+- Icones colorees par type d'evenement
+- Filtre par categorie
+
+### 4. Equipe Intramate (`SuperAdminTeam.tsx`)
+- Liste des membres internes (roles : superadmin, support, finance, **developpeur**)
+- Affichage du role, nom, email
+- Formulaire d'invitation pour ajouter un nouveau membre interne
+- Lecture depuis `user_roles` + `profiles`
+
+### 5. Configuration (`SuperAdminConfig.tsx`)
+- Version de la plateforme
+- Nombre de boutiques, utilisateurs, modules actifs
+- Toggle mode maintenance (localStorage pour le MVP)
+- URL de la plateforme
+
+### 6. Vue Globale amelioree
+- Revenu total reel depuis `transactions` (filtre `status = 'completed'`)
+- Tendances haut/bas comparees a la semaine precedente
+- Section "5 derniers evenements"
+
+### 7. Analytics enrichi
+- Graphique de revenus mensuels (en plus de la croissance boutiques)
+- Modules les plus populaires (bar chart horizontal)
 
 ---
 
-## 6. CTA Final -- Parallaxe de Briques
+## Details techniques
 
-- Fond avec des briques de modules qui flottent en parallaxe leger
-- Effet de profondeur immersif
-- Texte et bouton au centre avec effet glow
+### Migration base de donnees
 
----
+Ajouter le role `developer` a l'enum `app_role` :
+```sql
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'developer';
+```
 
-## 7. Navbar + Footer
-
-- **Navbar** : Ajouter un effet de scroll progressif (background qui se solidifie au scroll)
-- **Footer** : Design plus riche avec colonnes de liens, badges "Fait en Afrique", liens sociaux
-
----
-
-## Details Techniques
+Ajouter une politique RLS pour que les superadmins puissent lire tous les profils :
+```sql
+CREATE POLICY "Superadmins can view all profiles"
+ON public.profiles FOR SELECT
+USING (EXISTS (
+  SELECT 1 FROM user_roles
+  WHERE user_roles.user_id = auth.uid()
+  AND user_roles.role = 'superadmin'
+));
+```
 
 ### Fichiers a creer
-- `src/components/landing/ModularBricksHero.tsx` -- Nouvelle animation hero avec briques assemblantes
-- `src/components/landing/InteractiveModulesSection.tsx` -- Grille interactive de modules
-- `src/components/landing/StatsSection.tsx` -- Compteurs animes
-- `src/components/landing/FloatingBrick.tsx` -- Composant brique reutilisable avec animations
+
+| Fichier | Description |
+|---------|-------------|
+| `src/pages/AdminLogin.tsx` | Page de connexion dediee avec design premium sombre |
+| `src/components/superadmin/SuperAdminLayout.tsx` | Layout avec sidebar + header + Outlet pour sous-routes |
+| `src/components/superadmin/SuperAdminSidebar.tsx` | Sidebar de navigation avec groupes et liens actifs |
+| `src/components/superadmin/SuperAdminUsers.tsx` | Liste globale des utilisateurs |
+| `src/components/superadmin/SuperAdminActivity.tsx` | Journal d'activite / timeline |
+| `src/components/superadmin/SuperAdminTeam.tsx` | Gestion equipe interne avec 4 roles |
+| `src/components/superadmin/SuperAdminConfig.tsx` | Configuration et stats systeme |
 
 ### Fichiers a modifier
-- `src/components/landing/HeroSection.tsx` -- Remplacer par le nouveau hero
-- `src/components/landing/FeaturesSection.tsx` -- Remplacer par la grille interactive
-- `src/components/landing/HowItWorksSection.tsx` -- Ameliorer avec timeline animee
-- `src/components/landing/PricingSection.tsx` -- Glass-morphism + mini-briques
-- `src/components/landing/CTASection.tsx` -- Parallaxe de briques flottantes
-- `src/components/landing/Navbar.tsx` -- Effet scroll progressif
-- `src/components/landing/Footer.tsx` -- Design enrichi
-- `src/pages/Landing.tsx` -- Integrer les nouvelles sections
-- `src/index.css` -- Ajouter les styles glass-morphism et animations custom
 
-### Dependances
-Aucune nouvelle dependance -- tout sera fait avec Framer Motion (deja installe) et Tailwind CSS.
+| Fichier | Modification |
+|---------|-------------|
+| `src/pages/SuperAdmin.tsx` | Remplacer par le layout avec `<Outlet>` et verification de role admin |
+| `src/App.tsx` | Ajouter route `/admin` (login) + sous-routes `/admin/*` ; supprimer `/super-admin` |
+| `src/components/superadmin/SuperAdminOverview.tsx` | Enrichir avec revenus reels et activite recente |
+| `src/components/superadmin/SuperAdminAnalytics.tsx` | Ajouter graphique revenus + modules populaires |
+| `src/components/dashboard/DashboardSidebar.tsx` | Supprimer le lien Super Admin de la sidebar client |
 
-### Donnees dynamiques
-Les briques du hero et de la section modules utiliseront directement `modulesRegistry` de `src/lib/modules-registry.ts` pour afficher les vrais noms, icones et couleurs des modules -- garantissant la coherence avec le produit reel.
+### Securite
+- La verification du role se fait **cote serveur** via la table `user_roles` (jamais localStorage)
+- Les politiques RLS existantes protegent deja les tables sensibles pour les superadmins
+- Seuls les utilisateurs avec un role admin (superadmin/support/finance/developer) peuvent acceder a l'espace
+- Les roles support/finance/developer auront un acces en lecture seule pour le MVP
 
