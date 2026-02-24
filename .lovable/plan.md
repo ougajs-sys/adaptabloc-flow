@@ -1,86 +1,106 @@
 
 
-# Plan d'implementation MVP -- Phase 1 + Protection des modules
+# Redesign Premium de la Page d'Accueil -- Concept "Briques Modulaires"
 
-## Vue d'ensemble
+## Vision
 
-Ce plan couvre 3 axes :
-1. Corriger les 3 erreurs de build TypeScript
-2. Connecter les donnees reelles (totalOrders/totalSpent des clients, decompte stock)
-3. Marquer les modules non fonctionnels comme "Bientot disponible" pour empecher leur achat
+Transformer la landing page en une experience visuelle premium qui illustre le concept central d'Intramate : des briques/modules qui s'assemblent comme un puzzle pour creer un systeme sur mesure. L'animation hero montrera les modules flottants qui s'emboitent dynamiquement, evoquant immediatement la modularite et la simplicite.
 
 ---
 
-## 1. Corriger les erreurs de build (3 fichiers)
+## 1. Hero Section -- Animation "Briques qui s'assemblent"
 
-**Fichiers concernes :**
-- `supabase/functions/facebook-auth/index.ts` -- ligne 151 : `(err as Error).message`
-- `supabase/functions/send-invitation/index.ts` -- ligne 82 : `(err as Error).message`
-- `supabase/functions/submit-form/index.ts` -- ligne 185 : `(error as Error).message`
+Remplacer le hero actuel par une animation immersive :
 
----
+- **Fond** : Gradient fluide violet-vers-mint avec particules lumineuses subtiles
+- **Animation centrale** : Une grille de briques/cartes 3D representant les modules (Commandes, Clients, Livraisons, Stock, Campagnes, etc.) qui flottent separement puis s'assemblent progressivement en un tableau de bord unifie
+- **Chaque brique** affiche l'icone + le nom du module avec un leger effet de profondeur (ombre, rotation 3D)
+- **Sequence** : Les briques arrivent en cascade depuis differentes directions, tournent legerement, puis "cliquent" en place comme un puzzle -- evoquant la personnalisation
+- **Texte hero** superpose : "Construisez VOTRE systeme, brique par brique" avec le sous-titre actuel
+- **CTA** : Boutons existants (Facebook + Demo) avec un style glass-morphism premium
 
-## 2. Calculer totalOrders et totalSpent reels dans Customers
-
-**Fichier :** `src/pages/Customers.tsx`
-
-Actuellement, `totalOrders` et `totalSpent` sont codes en dur a `0` (lignes 81-82). La solution :
-- Apres avoir recupere les clients, faire une requete sur `orders` filtree par `store_id`
-- Grouper cote client par `customer_id` pour calculer le nombre de commandes et la somme des `total_amount`
-- Recuperer la date de la derniere commande pour `lastOrder`
+**Technologie** : Framer Motion `layout` animations + `variants` pour orchestrer l'assemblement des briques.
 
 ---
 
-## 3. Decompte automatique du stock a la creation de commande
+## 2. Section "Modules Interactifs" (remplace FeaturesSection)
 
-**Fichier :** `src/pages/Orders.tsx`
+Une grille interactive de briques modules :
 
-Dans `handleNewOrder`, apres l'insertion des `order_items`, pour chaque article qui a un `product_id` :
-- Lire le stock actuel du produit
-- Soustraire la quantite commandee
-- Mettre a jour le stock via `supabase.from("products").update({ stock })`
-
-Cela necessite que les items du formulaire de commande referencent un `product_id`. Verification du `NewOrderDialog` pour confirmer si c'est deja le cas.
-
----
-
-## 4. Marquer les modules non fonctionnels comme "Bientot disponible"
-
-**Fichier :** `src/lib/modules-registry.ts`
-- Ajouter un champ `available: boolean` a l'interface `ModuleDefinition`
-- Marquer `available: true` pour les modules fonctionnels :
-  - Tous les modules gratuits (dashboard, orders_basic, customers_basic, delivery_basic, team_basic)
-  - extra_callers, extra_preparers, extra_drivers
-  - campaigns
-  - embed_forms
-  - customer_history (une fois les stats reelles branchees)
-  - export (sera implemente en Phase 2)
-- Marquer `available: false` pour les modules non implementes :
-  - custom_fields, custom_status, message_templates
-  - stock_auto, multi_delivery, call_center, warehouse_team
-  - segmentation, loyalty
-  - geo_tracking, automations, api, multi_store, ai_assistant
-
-**Fichier :** `src/components/modules/ModuleCard.tsx`
-- Si `module.available === false` : afficher un badge "Bientot disponible", desactiver le switch, griser la carte
-
-**Fichier :** `src/components/billing/PaymentCheckout.tsx`
-- Filtrer les modules non disponibles pour empecher leur inclusion dans le panier de paiement
+- **Vue grille isometrique** : Les modules sont presentes comme des briques colorees dans une grille
+- **Hover** : Au survol, chaque brique s'eleve avec une ombre portee, revele sa description et pulse avec sa couleur de tier
+- **Couleurs par tier** : Gratuit = vert mint, Tier 1 = violet clair, Tier 2 = violet, Tier 3 = violet fonce/dore
+- **Effet "drag"** visuel : Les briques semblent deplacables (animation subtile de tremblement au hover)
+- **Compteur dynamique** : "22 modules disponibles -- Composez votre systeme ideal"
 
 ---
 
-## Resume des fichiers modifies
+## 3. Section "Comment ca marche" -- Timeline Animee
 
-| Fichier | Modification |
-|---------|-------------|
-| `supabase/functions/facebook-auth/index.ts` | Cast err as Error |
-| `supabase/functions/send-invitation/index.ts` | Cast err as Error |
-| `supabase/functions/submit-form/index.ts` | Cast error as Error |
-| `src/pages/Customers.tsx` | Requete orders pour totalOrders/totalSpent reels |
-| `src/pages/Orders.tsx` | Decompte stock auto apres creation commande |
-| `src/lib/modules-registry.ts` | Ajouter champ `available` a chaque module |
-| `src/components/modules/ModuleCard.tsx` | UI "Bientot disponible" + switch desactive |
-| `src/components/billing/PaymentCheckout.tsx` | Filtrer modules non disponibles |
+Ameliorer la section existante :
 
-Aucune migration de base de donnees n'est necessaire pour cette phase.
+- **Timeline verticale** avec une ligne animee qui se dessine au scroll
+- **Etape 2 revisitee** : Au lieu d'un simple texte, montrer une mini-animation de 3-4 briques qui s'ajoutent a un cadre avec le prix qui se calcule en temps reel
+- **Micro-interactions** : Chaque etape s'anime a l'entree dans le viewport
+
+---
+
+## 4. Section "Preuve Sociale / Stats" (nouvelle)
+
+Ajouter une section de confiance entre Features et Pricing :
+
+- Compteurs animes (commandes gerees, utilisateurs, pays)
+- Style : grands chiffres en Space Grotesk avec animation de comptage au scroll
+
+---
+
+## 5. Section Pricing -- Glass-morphism
+
+Ameliorer le design existant :
+
+- Cartes en glass-morphism (fond semi-transparent, blur, bordure lumineuse)
+- Plan populaire avec un halo lumineux anime
+- Les modules inclus dans chaque plan affiches comme des mini-briques colorees
+
+---
+
+## 6. CTA Final -- Parallaxe de Briques
+
+- Fond avec des briques de modules qui flottent en parallaxe leger
+- Effet de profondeur immersif
+- Texte et bouton au centre avec effet glow
+
+---
+
+## 7. Navbar + Footer
+
+- **Navbar** : Ajouter un effet de scroll progressif (background qui se solidifie au scroll)
+- **Footer** : Design plus riche avec colonnes de liens, badges "Fait en Afrique", liens sociaux
+
+---
+
+## Details Techniques
+
+### Fichiers a creer
+- `src/components/landing/ModularBricksHero.tsx` -- Nouvelle animation hero avec briques assemblantes
+- `src/components/landing/InteractiveModulesSection.tsx` -- Grille interactive de modules
+- `src/components/landing/StatsSection.tsx` -- Compteurs animes
+- `src/components/landing/FloatingBrick.tsx` -- Composant brique reutilisable avec animations
+
+### Fichiers a modifier
+- `src/components/landing/HeroSection.tsx` -- Remplacer par le nouveau hero
+- `src/components/landing/FeaturesSection.tsx` -- Remplacer par la grille interactive
+- `src/components/landing/HowItWorksSection.tsx` -- Ameliorer avec timeline animee
+- `src/components/landing/PricingSection.tsx` -- Glass-morphism + mini-briques
+- `src/components/landing/CTASection.tsx` -- Parallaxe de briques flottantes
+- `src/components/landing/Navbar.tsx` -- Effet scroll progressif
+- `src/components/landing/Footer.tsx` -- Design enrichi
+- `src/pages/Landing.tsx` -- Integrer les nouvelles sections
+- `src/index.css` -- Ajouter les styles glass-morphism et animations custom
+
+### Dependances
+Aucune nouvelle dependance -- tout sera fait avec Framer Motion (deja installe) et Tailwind CSS.
+
+### Donnees dynamiques
+Les briques du hero et de la section modules utiliseront directement `modulesRegistry` de `src/lib/modules-registry.ts` pour afficher les vrais noms, icones et couleurs des modules -- garantissant la coherence avec le produit reel.
 
