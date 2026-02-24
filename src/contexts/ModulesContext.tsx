@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { FREE_MODULE_IDS, getModuleById, calculateMonthlyPrice } from "@/lib/modules-registry";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { FREE_MODULE_IDS, getModuleById, modulesRegistry } from "@/lib/modules-registry";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useModulePricing } from "@/hooks/useModulePricing";
 
 interface ModulesContextValue {
   activeModules: string[];
@@ -12,6 +13,7 @@ interface ModulesContextValue {
   setModules: (ids: string[]) => void;
   monthlyPrice: number;
   isLoading: boolean;
+  getModulePrice: (moduleId: string) => number;
 }
 
 const ModulesContext = createContext<ModulesContextValue | null>(null);
@@ -21,8 +23,24 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   const storeId = user?.store_id;
   const [paidModules, setPaidModules] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { data: pricingOverrides = {} } = useModulePricing();
 
   const activeModules = [...new Set([...FREE_MODULE_IDS, ...paidModules])];
+
+  // Returns DB price override or registry default
+  const getModulePrice = useCallback(
+    (moduleId: string): number => {
+      if (moduleId in pricingOverrides) return pricingOverrides[moduleId];
+      return getModuleById(moduleId)?.price ?? 0;
+    },
+    [pricingOverrides]
+  );
+
+  // Monthly price using DB overrides
+  const monthlyPrice = useMemo(
+    () => activeModules.reduce((total, id) => total + getModulePrice(id), 0),
+    [activeModules, getModulePrice]
+  );
 
   // Fetch modules from DB when store changes
   useEffect(() => {
@@ -85,13 +103,11 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   const activateModule = useCallback(
     async (id: string) => {
       if (!storeId || FREE_MODULE_IDS.includes(id)) return;
-      // Optimistic update
       setPaidModules((prev) => [...new Set([...prev, id])]);
       const { error } = await supabase
         .from("store_modules")
         .insert({ store_id: storeId, module_id: id });
       if (error && !error.message.includes("duplicate")) {
-        // Revert on error
         setPaidModules((prev) => prev.filter((m) => m !== id));
       }
     },
@@ -101,7 +117,6 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   const deactivateModule = useCallback(
     async (id: string) => {
       if (!storeId || FREE_MODULE_IDS.includes(id)) return;
-      // Optimistic update
       setPaidModules((prev) => prev.filter((m) => m !== id));
       const { error } = await supabase
         .from("store_modules")
@@ -109,7 +124,6 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
         .eq("store_id", storeId)
         .eq("module_id", id);
       if (error) {
-        // Revert on error
         setPaidModules((prev) => [...new Set([...prev, id])]);
       }
     },
@@ -122,7 +136,6 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       const nonFree = ids.filter((id) => !FREE_MODULE_IDS.includes(id));
       setPaidModules(nonFree);
 
-      // Delete all existing, then insert new ones
       await supabase.from("store_modules").delete().eq("store_id", storeId);
       if (nonFree.length > 0) {
         await supabase
@@ -133,11 +146,9 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
     [storeId]
   );
 
-  const monthlyPrice = calculateMonthlyPrice(activeModules);
-
   return (
     <ModulesContext.Provider
-      value={{ activeModules, hasModule, isFeatureEnabled, activateModule, deactivateModule, setModules, monthlyPrice, isLoading }}
+      value={{ activeModules, hasModule, isFeatureEnabled, activateModule, deactivateModule, setModules, monthlyPrice, isLoading, getModulePrice }}
     >
       {children}
     </ModulesContext.Provider>

@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PaymentCheckout } from "@/components/billing/PaymentCheckout";
 
 const Billing = () => {
-  const { activeModules, monthlyPrice } = useModules();
+  const { activeModules, monthlyPrice, getModulePrice } = useModules();
   const navigate = useNavigate();
   const { user } = useAuth();
   const storeId = user?.store_id;
@@ -128,7 +128,7 @@ const Billing = () => {
                             <p className="text-xs text-muted-foreground truncate">{mod.description}</p>
                           </div>
                           <p className="text-sm font-semibold text-foreground whitespace-nowrap">
-                            {mod.price.toLocaleString("fr-FR")} <span className="text-xs font-normal text-muted-foreground">FCFA</span>
+                            {getModulePrice(mod.id).toLocaleString("fr-FR")} <span className="text-xs font-normal text-muted-foreground">FCFA</span>
                           </p>
                         </div>
                       </CardContent>

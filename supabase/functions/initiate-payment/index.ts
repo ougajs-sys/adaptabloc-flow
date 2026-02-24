@@ -16,7 +16,7 @@ function convertFromXOF(amountXOF: number, target: string): number {
   return Math.round(amountXOF * rate * 100) / 100;
 }
 
-const modulesPrices: Record<string, number> = {
+const defaultModulesPrices: Record<string, number> = {
   extra_callers: 2000, extra_preparers: 2000, extra_drivers: 3000,
   custom_fields: 2000, custom_status: 2500, export: 3000,
   message_templates: 2000, customer_history: 3000, stock_auto: 5000,
@@ -25,6 +25,17 @@ const modulesPrices: Record<string, number> = {
   geo_tracking: 10000, automations: 12000, api: 10000,
   multi_store: 15000, ai_assistant: 15000, embed_forms: 5000,
 };
+
+async function getModulePrices(supabaseAdmin: any): Promise<Record<string, number>> {
+  const prices = { ...defaultModulesPrices };
+  const { data } = await supabaseAdmin.from("module_pricing").select("module_id, price");
+  if (data) {
+    for (const row of data) {
+      prices[row.module_id] = row.price;
+    }
+  }
+  return prices;
+}
 
 async function initiatePayDunya(
   supabaseAdmin: any,
@@ -248,6 +259,9 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Fetch dynamic prices from DB
+    const modulesPrices = await getModulePrices(supabaseAdmin);
 
     // Calculate amounts
     const totalXOF = (modules as string[]).reduce((sum: number, id: string) => sum + (modulesPrices[id] || 0), 0);
