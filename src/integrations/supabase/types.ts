@@ -924,7 +924,15 @@ export type Database = {
       is_store_owner: { Args: { _store_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "caller" | "preparer" | "driver" | "superadmin"
+      app_role:
+        | "admin"
+        | "caller"
+        | "preparer"
+        | "driver"
+        | "superadmin"
+        | "developer"
+        | "support"
+        | "finance"
       campaign_status: "draft" | "scheduled" | "sent" | "cancelled"
       campaign_type: "sms" | "whatsapp" | "email"
       delivery_status:
@@ -1074,7 +1082,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "caller", "preparer", "driver", "superadmin"],
+      app_role: [
+        "admin",
+        "caller",
+        "preparer",
+        "driver",
+        "superadmin",
+        "developer",
+        "support",
+        "finance",
+      ],
       campaign_status: ["draft", "scheduled", "sent", "cancelled"],
       campaign_type: ["sms", "whatsapp", "email"],
       delivery_status: [

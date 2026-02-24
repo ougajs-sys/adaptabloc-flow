@@ -27,7 +27,18 @@ import Campaigns from "./pages/Campaigns";
 import EmbedForms from "./pages/EmbedForms";
 import EmbedOrder from "./pages/EmbedOrder";
 import SetupAdmin from "./pages/SetupAdmin";
-import SuperAdmin from "./pages/SuperAdmin";
+import AdminLogin from "./pages/AdminLogin";
+import SuperAdminLayout from "./components/superadmin/SuperAdminLayout";
+import SuperAdminOverview from "./components/superadmin/SuperAdminOverview";
+import SuperAdminStores from "./components/superadmin/SuperAdminStores";
+import SuperAdminUsers from "./components/superadmin/SuperAdminUsers";
+import SuperAdminFinances from "./components/superadmin/SuperAdminFinances";
+import SuperAdminModules from "./components/superadmin/SuperAdminModules";
+import SuperAdminAnalytics from "./components/superadmin/SuperAdminAnalytics";
+import SuperAdminProviders from "./components/superadmin/SuperAdminProviders";
+import SuperAdminActivity from "./components/superadmin/SuperAdminActivity";
+import SuperAdminTeam from "./components/superadmin/SuperAdminTeam";
+import SuperAdminConfig from "./components/superadmin/SuperAdminConfig";
 import type { ReactNode } from "react";
 
 const queryClient = new QueryClient();
@@ -65,7 +76,24 @@ const AppRoutes = () => (
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute><LivreurWorkspace /></ProtectedRoute>} />
     <Route path="/embed/order" element={<EmbedOrder />} />
     <Route path="/setup-admin" element={<SetupAdmin />} />
-    <Route path="/super-admin" element={<SuperAdmin />} />
+
+    {/* Admin HQ - login is standalone */}
+    <Route path="/admin/login" element={<AdminLogin />} />
+    {/* Admin HQ - workspace with layout */}
+    <Route path="/admin" element={<SuperAdminLayout />}>
+      <Route index element={<Navigate to="/admin/overview" replace />} />
+      <Route path="overview" element={<SuperAdminOverview />} />
+      <Route path="stores" element={<SuperAdminStores />} />
+      <Route path="users" element={<SuperAdminUsers />} />
+      <Route path="finances" element={<SuperAdminFinances />} />
+      <Route path="modules" element={<SuperAdminModules />} />
+      <Route path="analytics" element={<SuperAdminAnalytics />} />
+      <Route path="providers" element={<SuperAdminProviders />} />
+      <Route path="activity" element={<SuperAdminActivity />} />
+      <Route path="team" element={<SuperAdminTeam />} />
+      <Route path="config" element={<SuperAdminConfig />} />
+    </Route>
+
     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
     <Route path="*" element={<NotFound />} />
   </Routes>
