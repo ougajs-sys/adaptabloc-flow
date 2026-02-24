@@ -1,102 +1,67 @@
 
-# Audit complet de l'application Intramate -- Etat de preparation au lancement MVP
 
-## Verdict global
+# Analyse objective : le RBAC client est-il critique pour le MVP ?
 
-**L'application n'est PAS prete pour un test en usage reel dans son etat actuel.** Le coeur fonctionnel est solide, mais plusieurs blocages critiques empechent une utilisation fiable par de vrais utilisateurs.
+## Constat actuel
 
----
+**OUI, le probleme est reel et doit etre corrige avant le lancement.**
 
-## 1. Ce qui FONCTIONNE (cote client)
+Voici les faits verifies dans le code :
 
-| Fonctionnalite | Statut | Detail |
-|---|---|---|
-| Authentification (Email, Google, Facebook) | Operationnelle | Login/Signup avec OAuth, redirection onboarding |
-| Onboarding | Operationnel | 4 etapes, choix secteur, modules, infos boutique |
-| Tableau de bord | Operationnel | KPIs reels (CA, commandes, clients, livraisons), graphiques |
-| Commandes (CRUD + Kanban) | Operationnel | Creation, edition, suppression, pipeline Kanban, deduction stock |
-| Produits (CRUD + variantes) | Operationnel | Catalogue complet avec variantes, alertes stock |
-| Clients (CRUD + stats) | Operationnel | Fiche client, historique commandes, segmentation |
-| Livraisons | Operationnel | Creation, assignation livreur, suivi statut, realtime |
-| Equipe (invitations + quotas) | Operationnel | Invitations par email, gestion roles, quotas dynamiques |
-| Workspaces (Caller/Preparateur/Livreur) | Operationnels | Interfaces dediees par role avec actions contextuelles |
-| Modules (activation/desactivation) | Operationnel | Registre 27 modules, gate system, prix dynamiques depuis DB |
-| Formulaires embarques | Operationnel | Generateur iframe, apercu live, embed fonctionnel |
-| Embed Order (page anonyme) | Operationnel | Prise de commande anonyme via iframe |
-| Statistiques | Operationnel | KPIs, funnel pipeline, revenus par jour, perf equipe |
-| Aide et support (tickets) | Operationnel | FAQ, creation tickets, fil de discussion |
-| Facturation | ✅ Operationnel | Modules actifs, historique factures DB, prix synchronises |
-| Parametres boutique | Operationnel | Infos generales, notifications, facturation DB, apparence |
-| Mot de passe oublie | ✅ Operationnel | Flux resetPasswordForEmail sur la page Login |
+1. **`buildAppUser` (AuthContext.tsx, ligne 35)** : la requete sur `user_roles` ne selectionne que `store_id`. Le role (`admin`, `caller`, `preparateur`, `livreur`) est ignore.
 
-## 2. Ce qui FONCTIONNE (cote admin / Intramate HQ)
+2. **`ProtectedRoute` (App.tsx)** : verifie uniquement `isAuthenticated` et `has_completed_onboarding`. Aucune verification de role.
 
-| Fonctionnalite | Statut |
+3. **`DashboardSidebar`** : affiche toutes les entrees de menu (Billing, Settings, Team, Modules) a tous les utilisateurs connectes, quel que soit leur role.
+
+**Consequence concrete** : un livreur invite dans une boutique peut acceder a `/dashboard/billing`, `/dashboard/settings`, `/dashboard/team` et `/dashboard/modules`. Meme si les donnees sont protegees cote serveur par RLS, l'utilisateur voit des pages auxquelles il ne devrait pas avoir acces -- ce qui est inacceptable pour un produit en production.
+
+## Nuance importante
+
+La securite des **donnees** n'est pas en danger : les politiques RLS sur les tables `invoices`, `team_invitations`, `store_modules` bloquent deja les operations non autorisees cote serveur. Ce qui manque, c'est la **securite de l'interface** (defense en profondeur + UX correcte).
+
+## Plan d'implementation
+
+### Etape 1 : Ajouter `role` dans AuthContext
+
+- Modifier la requete `user_roles` : `.select("store_id, role")` au lieu de `.select("store_id")`
+- Extraire `role` : `const role = roles?.[0]?.role ?? null`
+- Ajouter `role: string | null` dans l'interface `AppUser` et dans l'objet retourne
+
+### Etape 2 : Creer un `ProtectedRoute` avec controle de role
+
+- Ajouter une prop optionnelle `allowedRoles?: string[]`
+- Si `allowedRoles` est fourni et que `user.role` n'est pas dedans, rediriger vers `/dashboard`
+- Les routes sans `allowedRoles` restent accessibles a tous les utilisateurs authentifies
+
+### Etape 3 : Securiser les routes dans App.tsx
+
+| Route | Roles autorises |
 |---|---|
-| Login admin + auto-redirection | Operationnel |
-| Vue d'ensemble (stores, revenus, tendances) | Operationnel |
-| Gestion des boutiques | Operationnel |
-| Gestion des utilisateurs | Operationnel |
-| Finances (transactions) | Operationnel |
-| Catalogue modules | Operationnel |
-| Tarification dynamique | Operationnel |
-| Prestataires de paiement | Operationnel |
-| Tickets support (reponse + notes internes) | Operationnel |
-| Equipe interne (roles superadmin/support/finance/dev) | Operationnel |
-| Notifications temps reel (son + toast) | Operationnel |
-| Activite recente | Operationnel |
+| `/dashboard/billing` | admin |
+| `/dashboard/settings` | admin |
+| `/dashboard/team` | admin |
+| `/dashboard/modules` | admin |
+| `/dashboard/workspace/caller` | admin, caller |
+| `/dashboard/workspace/preparateur` | admin, preparateur |
+| `/dashboard/workspace/livreur` | admin, livreur |
+| `/dashboard`, `/dashboard/orders`, `/dashboard/products`, `/dashboard/customers`, `/dashboard/deliveries`, `/dashboard/stats`, `/dashboard/help` | tous les roles |
 
----
+### Etape 4 : Masquer les liens non autorises dans la Sidebar
 
-## 3. BLOCAGES CRITIQUES restants
+- Ajouter une prop `requiredRoles?: string[]` aux items de la sidebar
+- Si le role de l'utilisateur n'est pas dans la liste, masquer l'entree (pas juste la verrouiller)
+- Cela evite la confusion : un livreur ne voit que les pages qui le concernent
 
-### BLOCAGE 1 : Paiement non fonctionnel en production
-- **PayDunya est en mode Sandbox** (cles de test dans les secrets)
-- Un utilisateur reel ne peut pas payer pour activer un module payant
-- **Action requise** : Remplacer les cles Sandbox par des cles live
+### Fichiers modifies
 
-### BLOCAGE 2 : Email/SMTP non configure
-- L'inscription par email fonctionne mais la verification d'email et les invitations equipe dependent du SMTP par defaut de Supabase
-- **Action requise** : Configurer un domaine SMTP (SendGrid, Resend, etc.)
+- `src/contexts/AuthContext.tsx` -- ajout du role
+- `src/App.tsx` -- ProtectedRoute avec allowedRoles + routes securisees
+- `src/components/dashboard/DashboardSidebar.tsx` -- masquage conditionnel des liens
 
-### BLOCAGE 3 : Campagnes SMS/WhatsApp -- coquille vide
-- Les campagnes se creent en brouillon mais il n'y a aucune logique d'envoi reel
-- **Action requise** : Integrer Twilio ou equivalent
+### Ce qui ne change PAS
 
----
+- Aucune migration de base de donnees (la colonne `role` existe deja dans `user_roles`)
+- Aucune modification RLS (la securite serveur est deja en place)
+- Aucun changement de design ou de fonctionnalite
 
-## 4. ✅ BLOCAGES RESOLUS
-
-| Blocage | Resolution |
-|---|---|
-| Settings mock data facturation | Remplace par vraies donnees DB (table invoices) |
-| Prix modules hardcodes vs DB | Synchronisation via hook useModulePricing + table module_pricing |
-| Edge function prix hardcodes | initiate-payment lit desormais module_pricing depuis la DB |
-| Pas de mot de passe oublie | Flux resetPasswordForEmail implemente sur la page Login |
-
----
-
-## 5. PROBLEMES IMPORTANTS (non bloquants mais degradants)
-
-| Probleme | Detail |
-|---|---|
-| Pas de pagination | Commandes, produits, clients charges en une seule requete |
-| Pas de verification telephone | Le numero de telephone n'est pas valide |
-| Driver performance = 0 | La page Statistics montre 0 pour tous les livreurs |
-| Temps moyen de preparation = hardcode 1.8h | Valeur statique |
-
----
-
-## 6. RECOMMANDATION -- Plan de lancement
-
-### Phase A : Pre-requis obligatoires (avant tout test reel)
-1. ~~Remplacer les mock data dans Settings~~ ✅
-2. ~~Synchroniser les prix modules depuis DB~~ ✅
-3. ~~Ajouter un flux "Mot de passe oublie"~~ ✅
-4. **Activer les paiements en production** (cles PayDunya live)
-5. **Configurer le SMTP** pour les emails
-
-### Phase B : Qualite de vie (avant ouverture large)
-6. Ajouter la pagination sur les listes
-7. Implementer l'envoi reel de campagnes
-8. Calculer les vraies stats livreurs
