@@ -10,11 +10,12 @@ interface ModuleCardProps {
 }
 
 export function ModuleCard({ module }: ModuleCardProps) {
-  const { hasModule, activateModule, deactivateModule } = useModules();
+  const { hasModule, activateModule, deactivateModule, getModulePrice } = useModules();
   const isActive = hasModule(module.id);
   const isFree = FREE_MODULE_IDS.includes(module.id);
   const isUnavailable = module.available === false;
   const Icon = module.icon;
+  const effectivePrice = getModulePrice(module.id);
 
   return (
     <Card className={`border transition-colors ${isUnavailable ? "border-border/40 opacity-60" : isActive ? "border-primary/40 bg-primary/5" : "border-border/60"}`}>
@@ -36,7 +37,7 @@ export function ModuleCard({ module }: ModuleCardProps) {
             <p className="text-xs text-muted-foreground line-clamp-2">{module.description}</p>
             {!isFree && (
               <p className={`mt-1 text-xs font-medium ${isUnavailable ? "text-muted-foreground" : "text-primary"}`}>
-                {module.price.toLocaleString("fr-FR")} FCFA/mois
+                {effectivePrice.toLocaleString("fr-FR")} FCFA/mois
               </p>
             )}
           </div>

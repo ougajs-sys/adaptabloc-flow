@@ -4,16 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2, Mail, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const { signIn, signUp, signInWithGoogle, signInWithFacebook, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -70,6 +73,80 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-sm"
+        >
+          <Link to="/" className="flex items-center justify-center gap-2 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-lg font-[Space_Grotesk]">IM</span>
+            </div>
+            <span className="text-2xl font-bold font-[Space_Grotesk] text-foreground">
+              Intra<span className="text-primary">mate</span>
+            </span>
+          </Link>
+
+          <h2 className="text-lg font-semibold text-foreground text-center mb-2">Mot de passe oublié</h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            Entrez votre email et nous vous enverrons un lien de réinitialisation.
+          </p>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              try {
+                const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                  redirectTo: `${window.location.origin}/login`,
+                });
+                if (error) throw error;
+                toast({
+                  title: "Email envoyé",
+                  description: "Vérifiez votre boîte mail pour réinitialiser votre mot de passe.",
+                });
+                setShowForgotPassword(false);
+              } catch (err: any) {
+                toast({ title: "Erreur", description: err.message, variant: "destructive" });
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="vous@email.com"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full h-11">
+              {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Mail size={18} className="mr-2" />}
+              Envoyer le lien
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(false)}
+              className="w-full flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft size={14} /> Retour à la connexion
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -172,6 +249,13 @@ const Login = () => {
                 {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Mail size={18} className="mr-2" />}
                 Se connecter
               </Button>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="w-full text-center text-sm text-primary hover:underline"
+              >
+                Mot de passe oublié ?
+              </button>
             </form>
           </TabsContent>
 

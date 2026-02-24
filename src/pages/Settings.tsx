@@ -11,12 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useModules } from "@/contexts/ModulesContext";
-import { modulesRegistry } from "@/lib/modules-registry";
-import {
-  mockInvoices, mockPaymentMethods,
-  type PaymentMethod,
-} from "@/lib/billing-store";
-import { getModuleById } from "@/lib/modules-registry";
+import { modulesRegistry, getModuleById } from "@/lib/modules-registry";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Store, Bell, CreditCard, Palette, Globe, Shield, Save, Upload,
-  Zap, Download, Trash2, Plus, Smartphone, Wallet,
+  Zap, Download, Plus,
 } from "lucide-react";
 
 /* ───── General Tab ───── */
@@ -237,40 +232,37 @@ function NotificationsTab() {
 
 /* ───── Billing Tab ───── */
 function BillingTab() {
-  const { activeModules, monthlyPrice } = useModules();
+  const { activeModules, monthlyPrice, getModulePrice } = useModules();
   const navigate = useNavigate();
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
+  const { user } = useAuth();
+  const storeId = user?.store_id;
+
+  // Fetch real invoices from DB
+  const { data: invoicesData = [] } = useQuery({
+    queryKey: ["settings-invoices", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("*")
+        .eq("store_id", storeId!)
+        .order("issued_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const paidModules = activeModules
     .map((id) => modulesRegistry.find((m) => m.id === id))
     .filter((m) => m && m.tier !== "free");
 
-  const handleSetDefault = (id: string) => {
-    setPaymentMethods((prev) =>
-      prev.map((pm) => ({ ...pm, isDefault: pm.id === id }))
-    );
-    toast({ title: "Moyen de paiement par défaut mis à jour" });
-  };
-
-  const handleRemove = (id: string) => {
-    setPaymentMethods((prev) => prev.filter((pm) => pm.id !== id));
-    toast({ title: "Moyen de paiement supprimé" });
-  };
-
-  const handleAddPayment = () => {
-    toast({ title: "Bientôt disponible", description: "L'ajout de moyens de paiement sera disponible prochainement." });
-  };
-
-  const paymentIcon = (type: string) => {
-    if (type === "card") return <CreditCard size={16} className="text-primary" />;
-    if (type.includes("money")) return <Smartphone size={16} className="text-primary" />;
-    return <Wallet size={16} className="text-primary" />;
-  };
-
   const statusBadge = (status: string) => {
     if (status === "paid") return <Badge variant="secondary" className="bg-green-500/10 text-green-600 text-xs">Payée</Badge>;
-    if (status === "pending") return <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-600 text-xs">En attente</Badge>;
-    return <Badge variant="destructive" className="text-xs">Échouée</Badge>;
+    if (status === "sent") return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 text-xs">Envoyée</Badge>;
+    if (status === "overdue") return <Badge variant="destructive" className="text-xs">En retard</Badge>;
+    if (status === "draft") return <Badge variant="secondary" className="text-xs">Brouillon</Badge>;
+    return <Badge variant="outline" className="text-xs">Annulée</Badge>;
   };
 
   return (
@@ -307,7 +299,7 @@ function BillingTab() {
               <div className="flex flex-wrap gap-2">
                 {paidModules.map((m) => (
                   <Badge key={m!.id} variant="secondary" className="text-xs">
-                    {m!.name} — {m!.price.toLocaleString("fr-FR")} FCFA
+                    {m!.name} — {getModulePrice(m!.id).toLocaleString("fr-FR")} FCFA
                   </Badge>
                 ))}
               </div>
@@ -316,97 +308,57 @@ function BillingTab() {
         </CardContent>
       </Card>
 
-      {/* Payment methods */}
+      {/* Payment methods - placeholder */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Shield size={18} className="text-primary" />
-                Moyens de paiement
-              </CardTitle>
-              <CardDescription>Gérez vos méthodes de paiement pour les abonnements.</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleAddPayment} className="gap-2">
-              <Plus size={14} /> Ajouter
-            </Button>
-          </div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Shield size={18} className="text-primary" />
+            Moyens de paiement
+          </CardTitle>
+          <CardDescription>La gestion des moyens de paiement est disponible sur la page Facturation.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {paymentMethods.length === 0 ? (
-            <div className="border border-dashed border-border rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground mb-3">Aucun moyen de paiement configuré</p>
-              <Button variant="outline" className="gap-2" onClick={handleAddPayment}>
-                <CreditCard size={16} /> Ajouter un moyen de paiement
-              </Button>
-            </div>
-          ) : (
-            paymentMethods.map((pm) => (
-              <div
-                key={pm.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
-              >
-                <div className="flex items-center gap-3">
-                  {paymentIcon(pm.type)}
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {pm.label} {pm.last4 && `•••• ${pm.last4}`}
-                    </p>
-                    {pm.isDefault && (
-                      <Badge variant="secondary" className="text-[10px] mt-0.5">Par défaut</Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!pm.isDefault && (
-                    <Button variant="ghost" size="sm" onClick={() => handleSetDefault(pm.id)}>
-                      Définir par défaut
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleRemove(pm.id)}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+        <CardContent>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/dashboard/billing")}>
+            <CreditCard size={14} /> Aller à la facturation
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Invoice history */}
+      {/* Invoice history from DB */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <CreditCard size={18} className="text-primary" />
             Historique des factures
           </CardTitle>
-          <CardDescription>Consultez et téléchargez vos factures passées.</CardDescription>
+          <CardDescription>Consultez vos factures passées.</CardDescription>
         </CardHeader>
         <CardContent>
+          {invoicesData.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Aucune facture pour le moment.</p>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Référence</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Modules</TableHead>
                 <TableHead>Montant</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockInvoices.map((inv) => (
+              {invoicesData.map((inv) => (
                 <TableRow key={inv.id}>
-                  <TableCell className="font-mono text-xs">{inv.id}</TableCell>
-                  <TableCell className="text-sm">{new Date(inv.date).toLocaleDateString("fr-FR")}</TableCell>
-                  <TableCell className="text-sm">{inv.modules.length > 0 ? inv.modules.map((id) => getModuleById(id)?.name ?? id).join(", ") : "Pack gratuit"}</TableCell>
+                  <TableCell className="font-mono text-xs">{inv.invoice_number}</TableCell>
+                  <TableCell className="text-sm">{new Date(inv.issued_at).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell className="text-sm font-medium">{inv.amount.toLocaleString("fr-FR")} FCFA</TableCell>
                   <TableCell>{statusBadge(inv.status)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => toast({ title: "Téléchargement simulé", description: `Facture ${inv.id}` })}
+                      onClick={() => toast({ title: "Téléchargement", description: `Facture ${inv.invoice_number}` })}
                     >
                       <Download size={14} />
                     </Button>
@@ -415,6 +367,7 @@ function BillingTab() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>
