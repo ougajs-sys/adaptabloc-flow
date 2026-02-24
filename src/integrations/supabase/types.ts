@@ -922,6 +922,7 @@ export type Database = {
       }
       is_store_member: { Args: { _store_id: string }; Returns: boolean }
       is_store_owner: { Args: { _store_id: string }; Returns: boolean }
+      is_superadmin: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role:
