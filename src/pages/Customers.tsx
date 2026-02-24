@@ -72,18 +72,41 @@ const Customers = () => {
       return;
     }
 
-    const mapped: Customer[] = (data || []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      phone: c.phone || "",
-      email: c.email || "",
-      segment: c.segment || "standard",
-      totalOrders: 0,
-      totalSpent: 0,
-      lastOrder: c.updated_at,
-      loyaltyPoints: c.loyalty_points ?? 0,
-      joinDate: c.created_at,
-    }));
+    // Fetch order stats per customer
+    const { data: ordersData } = await supabase
+      .from("orders")
+      .select("customer_id, total_amount, created_at")
+      .eq("store_id", storeId);
+
+    // Build stats map
+    const statsMap: Record<string, { count: number; spent: number; lastDate: string }> = {};
+    (ordersData || []).forEach((o) => {
+      if (!o.customer_id) return;
+      if (!statsMap[o.customer_id]) {
+        statsMap[o.customer_id] = { count: 0, spent: 0, lastDate: o.created_at };
+      }
+      statsMap[o.customer_id].count++;
+      statsMap[o.customer_id].spent += o.total_amount || 0;
+      if (o.created_at > statsMap[o.customer_id].lastDate) {
+        statsMap[o.customer_id].lastDate = o.created_at;
+      }
+    });
+
+    const mapped: Customer[] = (data || []).map((c) => {
+      const stats = statsMap[c.id];
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone || "",
+        email: c.email || "",
+        segment: c.segment || "standard",
+        totalOrders: stats?.count ?? 0,
+        totalSpent: stats?.spent ?? 0,
+        lastOrder: stats?.lastDate ?? c.updated_at,
+        loyaltyPoints: c.loyalty_points ?? 0,
+        joinDate: c.created_at,
+      };
+    });
 
     setCustomers(mapped);
     setLoading(false);

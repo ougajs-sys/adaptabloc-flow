@@ -171,17 +171,46 @@ const Orders = () => {
       return;
     }
 
-    // Insert order items
+    // Insert order items with product_id lookup + stock deduction
     if (values.items.length > 0) {
-      await supabase.from("order_items").insert(
-        values.items.map((i) => ({
+      // Lookup product IDs by name for this store
+      const { data: storeProducts } = await supabase
+        .from("products")
+        .select("id, name, stock")
+        .eq("store_id", storeId)
+        .eq("is_active", true);
+
+      const productMap = new Map(
+        (storeProducts || []).map((p) => [p.name, p])
+      );
+
+      const itemsToInsert = values.items.map((i) => {
+        const product = productMap.get(i.name);
+        return {
           order_id: newOrder.id,
+          product_id: product?.id || null,
           product_name: i.name,
           quantity: i.qty,
           unit_price: i.price,
           total_price: i.qty * i.price,
-        }))
-      );
+        };
+      });
+
+      await supabase.from("order_items").insert(itemsToInsert);
+
+      // Deduct stock for each product
+      for (const item of itemsToInsert) {
+        if (item.product_id) {
+          const product = productMap.get(item.product_name);
+          if (product && product.stock != null) {
+            const newStock = Math.max(0, product.stock - item.quantity);
+            await supabase
+              .from("products")
+              .update({ stock: newStock })
+              .eq("id", item.product_id);
+          }
+        }
+      }
     }
 
     toast({ title: "Commande créée" });

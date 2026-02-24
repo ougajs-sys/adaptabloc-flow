@@ -395,7 +395,6 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
-          payment_status: Database["public"]["Enums"]["payment_status"]
           prepared_by: string | null
           shipping_address: string | null
           shipping_city: string | null
@@ -413,7 +412,6 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
-          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -431,7 +429,6 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
-          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -939,7 +936,6 @@ export type Database = {
         | "failed"
       form_status: "active" | "draft" | "archived"
       invoice_status: "draft" | "sent" | "paid" | "overdue" | "cancelled"
-      payment_status: "pending" | "paid" | "refunded"
       order_status:
         | "new"
         | "caller_pending"

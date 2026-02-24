@@ -40,6 +40,7 @@ export interface ModuleDefinition {
   routes?: string[];
   features: string[];
   category: string;
+  available: boolean;
 }
 
 export const tierLabels: Record<ModuleTier, string> = {
@@ -68,6 +69,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard"],
     features: ["kpi_basic", "revenue_chart", "recent_orders"],
     category: "Principal",
+    available: true,
   },
   {
     id: "orders_basic",
@@ -79,6 +81,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/orders"],
     features: ["order_list", "order_detail", "order_create"],
     category: "Principal",
+    available: true,
   },
   {
     id: "customers_basic",
@@ -90,6 +93,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/customers"],
     features: ["customer_list", "customer_detail"],
     category: "Principal",
+    available: true,
   },
   {
     id: "delivery_basic",
@@ -101,6 +105,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/deliveries"],
     features: ["delivery_list", "delivery_status", "delivery_driver_link"],
     category: "Principal",
+    available: true,
   },
   {
     id: "team_basic",
@@ -112,6 +117,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/team"],
     features: ["team_management", "team_quotas", "team_performance_basic"],
     category: "Principal",
+    available: true,
   },
 
   // === TIER 1 ===
@@ -124,6 +130,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 2000,
     features: ["extra_callers_3"],
     category: "Équipe",
+    available: true,
   },
   {
     id: "extra_preparers",
@@ -134,6 +141,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 2000,
     features: ["extra_preparers_3"],
     category: "Équipe",
+    available: true,
   },
   {
     id: "extra_drivers",
@@ -144,6 +152,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 3000,
     features: ["extra_drivers_3"],
     category: "Équipe",
+    available: true,
   },
   {
     id: "custom_fields",
@@ -154,6 +163,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 2000,
     features: ["product_custom_fields", "customer_custom_fields"],
     category: "Personnalisation",
+    available: false,
   },
   {
     id: "custom_status",
@@ -164,6 +174,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 2500,
     features: ["order_custom_status"],
     category: "Personnalisation",
+    available: false,
   },
   {
     id: "export",
@@ -174,6 +185,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 3000,
     features: ["export_excel", "export_pdf"],
     category: "Outils",
+    available: false,
   },
   {
     id: "message_templates",
@@ -184,6 +196,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 2000,
     features: ["sms_templates", "whatsapp_templates"],
     category: "Communication",
+    available: false,
   },
   {
     id: "customer_history",
@@ -194,6 +207,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 3000,
     features: ["customer_purchase_history", "customer_timeline"],
     category: "Clients",
+    available: true,
   },
 
   // === TIER 2 ===
@@ -206,6 +220,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 5000,
     features: ["stock_alerts", "stock_fifo", "stock_auto_update"],
     category: "Produits",
+    available: false,
   },
   {
     id: "multi_delivery",
@@ -216,6 +231,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 5000,
     features: ["driver_management", "driver_assignment", "driver_stats", "unlimited_drivers"],
     category: "Équipe",
+    available: false,
   },
   {
     id: "call_center",
@@ -226,6 +242,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 7000,
     features: ["unlimited_callers", "call_scripts", "caller_performance"],
     category: "Équipe",
+    available: false,
   },
   {
     id: "warehouse_team",
@@ -236,6 +253,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 7000,
     features: ["unlimited_preparers", "warehouse_posts", "preparer_productivity"],
     category: "Équipe",
+    available: false,
   },
   {
     id: "segmentation",
@@ -246,6 +264,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 5000,
     features: ["customer_segments", "customer_filters_advanced"],
     category: "Clients",
+    available: false,
   },
   {
     id: "campaigns",
@@ -257,6 +276,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/campaigns"],
     features: ["campaign_create", "campaign_segments", "campaign_history"],
     category: "Communication",
+    available: true,
   },
   {
     id: "loyalty",
@@ -267,6 +287,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 6000,
     features: ["loyalty_points", "loyalty_rewards", "loyalty_tiers"],
     category: "Clients",
+    available: false,
   },
 
   // === TIER 3 ===
@@ -279,6 +300,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 10000,
     features: ["live_map", "driver_location", "delivery_eta"],
     category: "Livraisons",
+    available: false,
   },
   {
     id: "automations",
@@ -289,6 +311,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 12000,
     features: ["auto_reorder", "auto_pricing", "auto_categorize"],
     category: "Outils",
+    available: false,
   },
   {
     id: "api",
@@ -299,6 +322,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 10000,
     features: ["api_rest", "webhooks", "api_docs"],
     category: "Outils",
+    available: false,
   },
   {
     id: "multi_store",
@@ -309,6 +333,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 15000,
     features: ["store_management", "store_analytics", "store_switch"],
     category: "Principal",
+    available: false,
   },
   {
     id: "ai_assistant",
@@ -319,6 +344,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 15000,
     features: ["ai_chat", "ai_recommendations", "ai_reports"],
     category: "Outils",
+    available: false,
   },
 
   // === TIER 2 – Formulaire embarqué ===
@@ -332,6 +358,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     routes: ["/dashboard/forms"],
     features: ["form_builder", "form_embed_code", "form_order_capture", "form_analytics"],
     category: "Outils",
+    available: true,
   },
 ];
 
