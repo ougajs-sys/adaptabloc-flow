@@ -328,6 +328,30 @@ export type Database = {
           },
         ]
       }
+      module_pricing: {
+        Row: {
+          id: string
+          module_id: string
+          price: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          module_id: string
+          price?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          module_id?: string
+          price?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
