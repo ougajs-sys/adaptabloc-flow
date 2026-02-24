@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,12 +10,16 @@ interface Product {
 
 const EmbedOrder = () => {
   const [searchParams] = useSearchParams();
+  // Brand/UI params
   const brand = searchParams.get("brand") || "Ma Boutique";
   const color = `#${searchParams.get("color") || "8B5CF6"}`;
+  // Store resolution: prefer store_id query param, else fall back to formId (legacy)
+  const storeIdParam = searchParams.get("store_id") || "";
   const formId = searchParams.get("formId") || "";
   const redirectUrl = searchParams.get("redirect") || "";
   const preselectedProductId = searchParams.get("productId") || "";
 
+  const [storeId, setStoreId] = useState(storeIdParam);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState(preselectedProductId);
   const [name, setName] = useState("");
@@ -27,70 +31,123 @@ const EmbedOrder = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Fetch form to get store_id, then fetch products
+  // Resolve storeId from formId if store_id param is absent, then fetch products
   useEffect(() => {
-    if (!formId) return;
     (async () => {
-      // We use the edge function URL pattern to fetch products via form's store_id
-      // But since this is public, we query directly with anon key
-      const { data: form } = await supabase
-        .from("embed_forms")
-        .select("store_id")
-        .eq("id", formId)
-        .maybeSingle();
+      let resolvedStoreId = storeIdParam;
 
-      if (!form) return;
+      if (!resolvedStoreId && formId) {
+        const { data: form } = await supabase
+          .from("embed_forms")
+          .select("store_id")
+          .eq("id", formId)
+          .maybeSingle();
+        resolvedStoreId = form?.store_id || "";
+      }
+
+      if (!resolvedStoreId) return;
+      setStoreId(resolvedStoreId);
 
       const { data: prods } = await supabase
         .from("products")
         .select("id, name, price")
-        .eq("store_id", form.store_id)
+        .eq("store_id", resolvedStoreId)
         .eq("is_active", true)
         .order("name");
 
       setProducts(prods || []);
     })();
-  }, [formId]);
+  }, [storeIdParam, formId]);
 
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const total = (selectedProduct?.price || 0) * quantity;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formId) return;
+
+    // Client-side validation: a product must be selected
+    if (!selectedProduct) {
+      setError("Veuillez sélectionner un produit.");
+      return;
+    }
+    if (!storeId) {
+      setError("Configuration invalide : store non identifié.");
+      return;
+    }
 
     setSubmitting(true);
     setError("");
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("submit-form", {
-        body: {
-          formId,
-          data: {
-            name,
-            phone,
-            product: selectedProduct?.name || "",
-            quantity: String(quantity),
-            address,
-          },
-        },
-      });
+      // 1. Upsert customer by phone + store_id
+      let customerId: string | null = null;
+      {
+        // Try to find existing customer
+        const { data: existing } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("store_id", storeId)
+          .eq("phone", phone)
+          .maybeSingle();
 
-      if (fnError) throw fnError;
-
-      if (data?.success) {
-        setSuccessMessage(data.message || "Commande enregistrée avec succès !");
-        setSuccess(true);
-        if (redirectUrl) {
-          setTimeout(() => {
-            window.top?.location.assign(redirectUrl);
-          }, 2000);
+        if (existing) {
+          customerId = existing.id;
+        } else {
+          const { data: created, error: customerError } = await supabase
+            .from("customers")
+            .insert({ store_id: storeId, name, phone, address, source: "embed_form" })
+            .select("id")
+            .single();
+          if (customerError) throw customerError;
+          customerId = created.id;
         }
-      } else {
-        setError(data?.error || "Une erreur est survenue");
       }
-    } catch (err: any) {
-      setError(err.message || "Erreur de connexion");
+
+      // 2. Generate order number (timestamp + random suffix to avoid collisions)
+      const rand = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
+      const orderNumber = `CMD-${Date.now().toString().slice(-8)}${rand}`;
+
+      // 3. Create order
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          store_id: storeId,
+          customer_id: customerId,
+          order_number: orderNumber,
+          total_amount: total,
+          shipping_address: address,
+          source: "embed_form",
+          status: "new",
+        })
+        .select("id")
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 4. Create order item
+      const { error: itemError } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: order.id,
+          product_id: selectedProduct.id,
+          product_name: selectedProduct.name,
+          quantity,
+          unit_price: selectedProduct.price,
+          total_price: total,
+        });
+
+      if (itemError) throw itemError;
+
+      setSuccessMessage(`Commande ${orderNumber} enregistrée avec succès !`);
+      setSuccess(true);
+      if (redirectUrl) {
+        setTimeout(() => {
+          window.top?.location.assign(redirectUrl);
+        }, 2000);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur de connexion";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -298,3 +355,4 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default EmbedOrder;
+
