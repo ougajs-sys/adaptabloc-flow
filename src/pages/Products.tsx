@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { usePagination } from "@/hooks/usePagination";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -201,6 +203,9 @@ const Products = () => {
     return matchSearch && matchCategory;
   });
 
+  const PAGE_SIZE = 20;
+  const { page, totalPages, paginated: paginatedProducts, next, prev, goTo, total: filteredTotal } = usePagination(filtered, PAGE_SIZE);
+
   const lowStock = products.filter((p) => p.stock > 0 && p.stock <= p.maxStock * 0.15).length;
   const outOfStock = products.filter((p) => p.stock === 0).length;
 
@@ -278,8 +283,9 @@ const Products = () => {
           <p className="text-sm">Ajoutez votre premier produit pour commencer.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((product) => {
+          {paginatedProducts.map((product) => {
             const stockPercent = product.maxStock > 0 ? Math.round((product.stock / product.maxStock) * 100) : 0;
             const isLow = stockPercent > 0 && stockPercent <= 15;
             const st = statusLabels[product.status];
@@ -311,6 +317,8 @@ const Products = () => {
             );
           })}
         </div>
+        <DataPagination page={page} totalPages={totalPages} total={filteredTotal} pageSize={PAGE_SIZE} onPrev={prev} onNext={next} onGoTo={goTo} />
+        </>
       )}
     </DashboardLayout>
     </>

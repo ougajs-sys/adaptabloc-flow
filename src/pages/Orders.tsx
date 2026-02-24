@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
+import { usePagination } from "@/hooks/usePagination";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -262,6 +264,9 @@ const Orders = () => {
     return matchSearch && matchStatus;
   });
 
+  const PAGE_SIZE = 20;
+  const { page, totalPages, paginated: paginatedOrders, next, prev, goTo, total: filteredTotal } = usePagination(filtered, PAGE_SIZE);
+
   const handleAdvance = useCallback(async (orderId: string, nextStatus: OrderPipelineStatus) => {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
@@ -277,7 +282,7 @@ const Orders = () => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o)));
   }, [orders]);
 
-  const pipelineOrders: PipelineOrder[] = filtered.map((o) => ({
+  const pipelineOrders: PipelineOrder[] = (viewMode === "kanban" ? filtered : paginatedOrders).map((o) => ({
     id: o.id, customer: o.customer, phone: o.phone, address: o.address,
     total: o.total, itemCount: o.items.length, status: o.status, assignee: o.assignee, date: o.date,
   }));
@@ -388,7 +393,7 @@ const Orders = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((order) => {
+                {paginatedOrders.map((order) => {
                   const stage = getStageByStatus(order.status);
                   const payment = paymentConfig[order.paymentStatus] || paymentConfig.pending;
                   return (
@@ -417,6 +422,7 @@ const Orders = () => {
                 })}
               </TableBody>
             </Table>
+            <DataPagination page={page} totalPages={totalPages} total={filteredTotal} pageSize={PAGE_SIZE} onPrev={prev} onNext={next} onGoTo={goTo} />
           </CardContent>
         </Card>
       )}
