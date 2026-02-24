@@ -1,93 +1,128 @@
 
-Objectif: rendre l’accès admin réellement trouvable et fiable, puis éliminer les faux signaux d’erreur qui donnent l’impression que l’espace est “inaccessible”.
+# Audit complet de l'application Intramate -- Etat de preparation au lancement MVP
 
-Constat après analyse approfondie
-1) Les routes admin existent et fonctionnent déjà techniquement:
-- `/admin/login` charge bien la page “Intramate HQ”.
-- `/admin` redirige vers le login admin si l’utilisateur n’est pas authentifié/autorisé.
-- L’espace admin est atteignable et la sidebar s’affiche correctement (capture validée).
+## Verdict global
 
-2) Le vrai problème est la découvrabilité du chemin:
-- Sur la landing (`/`), aucun lien visible vers l’accès équipe.
-- Le bouton “Se connecter” pointe vers `/login` (espace client), donc un admin ne voit pas naturellement le bon point d’entrée.
+**L'application n'est PAS prete pour un test en usage reel dans son etat actuel.** Le coeur fonctionnel est solide, mais plusieurs blocages critiques empechent une utilisation fiable par de vrais utilisateurs.
 
-3) Un bruit technique renforce l’impression de panne:
-- Des erreurs 406 apparaissent en console sur lecture `profiles` (requête `.single()` quand profil absent).
-- Ce n’est pas bloquant pour l’accès admin, mais ça donne visuellement l’impression d’un système cassé.
+---
 
-Plan de correction (efficace et ciblé)
+## 1. Ce qui FONCTIONNE (cote client)
 
-Phase 1 — Rendre le chemin admin visible sans casser l’isolation
-A. Landing navbar (desktop + mobile)
-- Ajouter un lien discret “Accès équipe” vers `/admin/login` dans `src/components/landing/Navbar.tsx`.
-- Garder “Se connecter” pour les clients (`/login`) pour ne pas mélanger les parcours.
+| Fonctionnalite | Statut | Detail |
+|---|---|---|
+| Authentification (Email, Google, Facebook) | Operationnelle | Login/Signup avec OAuth, redirection onboarding |
+| Onboarding | Operationnel | 4 etapes, choix secteur, modules, infos boutique |
+| Tableau de bord | Operationnel | KPIs reels (CA, commandes, clients, livraisons), graphiques |
+| Commandes (CRUD + Kanban) | Operationnel | Creation, edition, suppression, pipeline Kanban, deduction stock |
+| Produits (CRUD + variantes) | Operationnel | Catalogue complet avec variantes, alertes stock |
+| Clients (CRUD + stats) | Operationnel | Fiche client, historique commandes, segmentation |
+| Livraisons | Operationnel | Creation, assignation livreur, suivi statut, realtime |
+| Equipe (invitations + quotas) | Operationnel | Invitations par email, gestion roles, quotas dynamiques |
+| Workspaces (Caller/Preparateur/Livreur) | Operationnels | Interfaces dediees par role avec actions contextuelles |
+| Modules (activation/desactivation) | Operationnel | Registre 27 modules, gate system, prix dynamiques |
+| Formulaires embarques | Operationnel | Generateur iframe, apercu live, embed fonctionnel |
+| Embed Order (page anonyme) | Operationnel | Prise de commande anonyme via iframe |
+| Statistiques | Operationnel | KPIs, funnel pipeline, revenus par jour, perf equipe |
+| Aide et support (tickets) | Operationnel | FAQ, creation tickets, fil de discussion |
+| Facturation | Partiellement | Affichage modules actifs, historique factures DB |
+| Parametres boutique | Operationnel | Infos generales, notifications, regionalisation |
 
-B. Footer landing
-- Ajouter un lien “Espace administration” dans `src/components/landing/Footer.tsx` pour un point d’entrée permanent.
+## 2. Ce qui FONCTIONNE (cote admin / Intramate HQ)
 
-C. Login client
-- Ajouter un lien secondaire “Vous êtes de l’équipe Intramate ? Accéder à l’espace admin” dans `src/pages/Login.tsx`.
-- Cela réduit immédiatement les erreurs d’aiguillage.
+| Fonctionnalite | Statut |
+|---|---|
+| Login admin + auto-redirection | Operationnel |
+| Vue d'ensemble (stores, revenus, tendances) | Operationnel |
+| Gestion des boutiques | Operationnel |
+| Gestion des utilisateurs | Operationnel |
+| Finances (transactions) | Operationnel |
+| Catalogue modules | Operationnel |
+| Tarification dynamique | Operationnel |
+| Prestataires de paiement | Operationnel |
+| Tickets support (reponse + notes internes) | Operationnel |
+| Equipe interne (roles superadmin/support/finance/dev) | Operationnel |
+| Notifications temps reel (son + toast) | Operationnel |
+| Activite recente | Operationnel |
 
-Phase 2 — Renforcer les routes d’entrée admin
-A. Alias de compatibilité (anti-friction)
-- Dans `src/App.tsx`, ajouter des redirections:
-  - `/admin-login` → `/admin/login`
-  - `/hq/login` → `/admin/login`
-  - `/hq` → `/admin/login`
-- Résultat: même si vous tapez une ancienne URL, vous retombez sur la bonne porte.
+---
 
-B. Expérience de login admin plus robuste
-- Dans `src/pages/AdminLogin.tsx`:
-  - si un admin est déjà connecté, redirection automatique vers `/admin/overview`.
-  - message d’erreur plus explicite pour compte non autorisé.
-- Évite l’effet “je suis connecté mais je ne vois rien”.
+## 3. BLOCAGES CRITIQUES pour un lancement reel
 
-Phase 3 — Nettoyage du faux signal d’erreur (console)
-A. AuthContext
-- Dans `src/contexts/AuthContext.tsx`, remplacer la lecture profil stricte `.single()` par une lecture tolérante (type `maybeSingle`) pour éviter les 406 non bloquants quand un profil n’existe pas encore.
-- Ajouter garde-fou pour que l’absence de profil ne soit jamais traitée comme une panne.
+### BLOCAGE 1 : Paiement non fonctionnel en production
+- **PayDunya est en mode Sandbox** (cles de test dans les secrets)
+- Un utilisateur reel ne peut pas payer pour activer un module payant
+- Sans paiement fonctionnel, le modele economique ne tourne pas
+- **Impact** : Aucun revenu possible, modules payants activables gratuitement
 
-Pourquoi c’est la bonne correction
-- Vous gardez une séparation claire client/admin (sécurité + architecture respectées).
-- L’URL admin devient immédiatement visible et mémorisable.
-- Les utilisateurs ne se retrouvent plus “coincés” sur `/login` client.
-- Les erreurs console trompeuses sont supprimées.
+### BLOCAGE 2 : Email de confirmation non configure
+- L'inscription par email fonctionne mais la verification d'email n'est pas confirmee comme active/desactivee
+- Si active : les utilisateurs ne recevront probablement pas d'email (pas de domaine SMTP configure)
+- Si desactivee : risque de comptes spam
+- **Impact** : Premiere experience utilisateur potentiellement cassee
 
-Fichiers ciblés
-- `src/components/landing/Navbar.tsx` (lien accès équipe)
-- `src/components/landing/Footer.tsx` (entrée admin persistante)
-- `src/pages/Login.tsx` (pont vers admin)
-- `src/App.tsx` (routes alias + redirections)
-- `src/pages/AdminLogin.tsx` (auto-redirection admin déjà connecté)
-- `src/contexts/AuthContext.tsx` (suppression 406 parasites)
+### BLOCAGE 3 : Envoi d'invitations equipe non garanti
+- L'edge function `send-invitation` est appelee mais le systeme d'envoi reel (SMTP/SendGrid) n'est pas verifie
+- Le code traite l'echec d'envoi comme "best-effort" (log + continue)
+- **Impact** : Un admin invite un membre, aucun email n'arrive, l'invitee ne sait pas qu'il est invite
 
-Sécurité (inchangée, conservée)
-- Les rôles restent dans `user_roles` uniquement.
-- Aucun contrôle d’admin en localStorage/hardcoded.
-- Validation d’accès admin toujours basée sur la base de données côté backend.
+### BLOCAGE 4 : Campagnes SMS/WhatsApp -- coquille vide
+- Les campagnes se creent en brouillon mais il n'y a aucune logique d'envoi reel (pas d'integration Twilio/WhatsApp Business API)
+- Le bouton "Envoyer" n'existe pas, seule la creation de brouillons fonctionne
+- **Impact** : Module payant sans valeur ajoutee reelle
 
-Plan de validation end-to-end
-1) Depuis `/`:
-- Vérifier présence du lien “Accès équipe” (desktop + mobile).
-- Cliquer et confirmer arrivée sur `/admin/login`.
+### BLOCAGE 5 : Settings -- donnees mock dans la facturation
+- L'onglet Billing dans Settings utilise encore `mockInvoices` et `mockPaymentMethods` (import depuis `billing-store.ts`)
+- Contradiction avec la page Billing principale qui utilise les vraies donnees DB
+- **Impact** : Donnees incoherentes, confusion utilisateur
 
-2) Depuis `/login` client:
-- Vérifier le lien secondaire admin et la navigation correcte.
+---
 
-3) Flux admin complet:
-- Connexion avec `ougajs@gmail.com` → arrivée `/admin/overview`.
-- Refresh de page sur route admin profonde (`/admin/tickets`) sans perte d’accès.
+## 4. PROBLEMES IMPORTANTS (non bloquants mais degradants)
 
-4) Flux non-admin:
-- Tentative de connexion admin avec compte client → message refus explicite.
-- Aucune fuite vers pages admin.
+| Probleme | Detail |
+|---|---|
+| Pas de pagination | Commandes, produits, clients charges en une seule requete. Limite de 1000 rows Supabase atteinte rapidement |
+| Pas de mot de passe oublie | Aucun flux "Forgot password" |
+| Pas de verification telephone | Le numero de telephone n'est pas valide (format, existence) |
+| Pas de confirmation email apres inscription | L'utilisateur est redirige directement vers l'onboarding |
+| Prix modules hardcodes vs DB | Les prix affiches cote client viennent du registre local, pas de la table `module_pricing` (que l'admin peut modifier) |
+| Driver performance = 0 | La page Statistics montre 0 pour tous les livreurs (pas de jointure avec la table deliveries) |
+| Temps moyen de preparation = hardcode 1.8h | Valeur statique, pas calculee a partir des donnees reelles |
+| Pas de deconnexion visible | Le bouton logout n'est pas visible dans la sidebar client (a verifier) |
+| Pas de dark mode fonctionnel | `next-themes` est installe mais pas utilise |
 
-5) Régression:
-- Parcours client standard inchangé (`/login` et dashboard).
-- Console sans 406 “profiles” parasites sur les parcours auth.
+---
 
-Résultat attendu
-- Le chemin de connexion admin n’est plus “invisible”.
-- L’accès admin devient simple, direct, et fiable.
-- L’expérience perçue “inaccessible” disparaît côté utilisateur final.
+## 5. MODULES MARQUES "available: false" (17 modules)
+
+Ces modules sont correctement bloques a l'achat (garde-fou en place). Les 10 modules "available: true" sont :
+- 5 modules gratuits (dashboard, orders, customers, delivery, team)
+- 5 modules payants fonctionnels (extra_callers, extra_preparers, extra_drivers, customer_history, campaigns, embed_forms)
+
+---
+
+## 6. RECOMMANDATION -- Plan de lancement
+
+### Phase A : Pre-requis obligatoires (avant tout test reel)
+1. **Activer les paiements en production** (PayDunya ou CinetPay avec cles live)
+2. **Configurer le SMTP** pour les emails (invitations equipe, confirmations)
+3. **Ajouter un flux "Mot de passe oublie"**
+4. **Remplacer les mock data** dans Settings/BillingTab par les vraies donnees DB
+5. **Synchroniser les prix** : faire lire `module_pricing` (DB) cote client au lieu du registre local
+
+### Phase B : Qualite de vie (avant ouverture large)
+6. Ajouter la pagination sur les listes (commandes, clients, produits)
+7. Implementer l'envoi reel de campagnes (au moins SMS via un prestataire)
+8. Calculer les vraies stats livreurs (jointure deliveries)
+9. Ajouter la gestion du mot de passe oublie
+
+### Phase C : Test beta prive
+- Deployer avec 3-5 boutiques pilotes en condition reelle
+- Collecter les retours sur le flux complet : inscription -> onboarding -> ajout produit -> commande -> equipe -> livraison -> facturation
+
+---
+
+## Resume en une phrase
+
+> Le squelette complet d'un SaaS E-commerce est la, les 10 modules fonctionnels sont solides, mais le circuit de paiement reel, l'envoi d'emails et la coherence des donnees de facturation doivent etre resolus avant de mettre l'application entre les mains de vrais utilisateurs.
