@@ -93,7 +93,12 @@ export function PaymentCheckout() {
     fetchData();
   }, [storeId]);
 
-  const paidModuleIds = activeModules.filter((id) => !FREE_MODULE_IDS.includes(id));
+  const paidModuleIds = activeModules.filter((id) => {
+    if (FREE_MODULE_IDS.includes(id)) return false;
+    const mod = getModuleById(id);
+    if (mod && mod.available === false) return false;
+    return true;
+  });
   const totalXOF = monthlyPrice;
   const totalConverted = convertFromXOF(totalXOF, currency);
 
