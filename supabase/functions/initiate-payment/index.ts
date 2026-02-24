@@ -98,8 +98,8 @@ async function initiatePayDunya(
     },
   };
 
-  // Use sandbox or live based on environment
-  const apiBase = "https://app.paydunya.com/sandbox-api/v1";
+  // Production API
+  const apiBase = "https://app.paydunya.com/api/v1";
 
   const paydunyaRes = await fetch(`${apiBase}/checkout-invoice/create`, {
     method: "POST",
