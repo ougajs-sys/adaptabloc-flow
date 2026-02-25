@@ -1,31 +1,42 @@
 
-# Plan d'implementation — Flux d'inscription equipe (COMPLETE)
 
-## Ce qui a ete fait
+# Contre-analyse objective : App.tsx et RBAC
 
-### Etape 1 : Trigger sur auth.users ✅
-Le trigger `on_auth_user_created_check_invites` existait deja en base. Il execute `handle_invited_user()` qui assigne automatiquement `store_id` + `role` aux membres invites lors de leur inscription.
+## Verdict : Les 3 etapes demandees sont DEJA implementees
 
-### Etape 2 : Table admin_join_requests ✅
-Table creee avec RLS :
-- Les utilisateurs peuvent voir/inserer leurs propres demandes
-- Les superadmins peuvent tout voir/modifier/supprimer
-- Trigger `updated_at` automatique
+Apres verification rigoureuse du code actuel :
 
-### Etape 3 : Formulaire de demande d'acces HQ ✅
-Sur `/admin/login` :
-- Vue "login" : connexion classique + bouton "Demander un acces"
-- Vue "request" : formulaire (nom, email, mot de passe, role souhaite)
-- Vue "pending" : message d'attente de validation
+### Etape 1 -- `allowedRoles` dans ProtectedRoute
+**Deja fait.** Ligne 48 : `function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] })`
 
-### Etape 4 : Validation dans SuperAdminTeam ✅
-Section "Demandes en attente" avec :
-- Liste des demandes pending
-- Boutons Approuver (insere dans user_roles) et Rejeter
-- Mise a jour du statut dans admin_join_requests
+### Etape 2 -- Regle de blocage
+**Deja fait.** Lignes 54-56 : si `allowedRoles` est defini et que le role n'est pas dedans, redirection vers `/dashboard`.
 
-### Etape 5 : Blocage d'acces HQ ✅
-Dans AdminLogin.tsx :
-- Si l'utilisateur a une demande pending → affiche "En attente"
-- Si la demande est rejetee → affiche "Demande refusee"
-- Si aucun role admin → "Acces refuse"
+### Etape 3 -- Routes securisees
+**Deja fait.** Les routes `/dashboard/billing`, `/dashboard/settings`, `/dashboard/team`, `/dashboard/modules` ont `allowedRoles={["admin"]}`. Les workspaces ont leurs roles respectifs.
+
+### AuthContext
+**Deja fait.** `role: string | null` est dans `AppUser` (ligne 14), et `buildAppUser` selectionne bien `store_id, role` (ligne 36).
+
+---
+
+## Un vrai probleme detecte : incoherence des noms de roles
+
+Il y a un **bug reel** dans les routes workspace :
+
+| Route | Role actuel dans App.tsx | Role attendu (table `user_roles` / `team-roles.ts`) |
+|---|---|---|
+| `/dashboard/workspace/preparateur` | `"preparer"` (ligne 80) | `"preparateur"` |
+| `/dashboard/workspace/livreur` | `"driver"` (ligne 81) | `"livreur"` |
+
+Le fichier `src/lib/team-roles.ts` definit les roles comme `"preparateur"` et `"livreur"`, pas `"preparer"` et `"driver"`. Si la base de donnees stocke `preparateur` et `livreur`, alors les routes workspace sont **inaccessibles** pour ces roles a cause de cette incoherence.
+
+## Plan de correction
+
+Modifier uniquement les lignes 80 et 81 de `App.tsx` pour aligner les noms de roles :
+
+- Ligne 80 : `allowedRoles={["admin", "preparer"]}` → `allowedRoles={["admin", "preparateur"]}`
+- Ligne 81 : `allowedRoles={["admin", "driver"]}` → `allowedRoles={["admin", "livreur"]}`
+
+Aucun autre fichier a modifier.
+
