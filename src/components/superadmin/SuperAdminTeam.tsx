@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, UserPlus, Loader2, Trash2 } from "lucide-react";
+import { Shield, UserPlus, Loader2, Trash2, Check, X, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -35,20 +34,28 @@ interface TeamMember {
   created_at: string;
 }
 
-// Placeholder store_id for internal team members without a real store
-const INTERNAL_STORE_ID = "00000000-0000-0000-0000-000000000000";
+interface JoinRequest {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  requested_role: string;
+  status: string;
+  created_at: string;
+}
 
 export default function SuperAdminTeam() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<InternalRole>("support");
   const [inviting, setInviting] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   async function loadMembers() {
-    // Get all user_roles with internal admin roles
     const { data: roles } = await supabase
       .from("user_roles")
       .select("id, user_id, role, store_id, created_at");
@@ -59,49 +66,55 @@ export default function SuperAdminTeam() {
 
     if (internalRoles.length === 0) {
       setMembers([]);
-      setLoading(false);
-      return;
+    } else {
+      const userIds = [...new Set(internalRoles.map((r) => r.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, name, email")
+        .in("user_id", userIds);
+
+      const profileMap = new Map(
+        (profiles || []).map((p) => [p.user_id, { name: p.name, email: p.email }])
+      );
+
+      const teamMembers: TeamMember[] = internalRoles.map((r) => {
+        const profile = profileMap.get(r.user_id);
+        return {
+          id: r.id,
+          user_id: r.user_id,
+          role: r.role as InternalRole,
+          name: profile?.name || "Utilisateur",
+          email: profile?.email || null,
+          created_at: r.created_at,
+        };
+      });
+
+      const deduped = new Map<string, TeamMember>();
+      teamMembers.forEach((m) => {
+        const existing = deduped.get(m.user_id);
+        if (!existing || INTERNAL_ROLES.indexOf(m.role) < INTERNAL_ROLES.indexOf(existing.role)) {
+          deduped.set(m.user_id, m);
+        }
+      });
+
+      setMembers(Array.from(deduped.values()));
     }
 
-    const userIds = [...new Set(internalRoles.map((r) => r.user_id))];
-
-    // Fetch profiles for these users
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("user_id, name, email")
-      .in("user_id", userIds);
-
-    const profileMap = new Map(
-      (profiles || []).map((p) => [p.user_id, { name: p.name, email: p.email }])
-    );
-
-    const teamMembers: TeamMember[] = internalRoles.map((r) => {
-      const profile = profileMap.get(r.user_id);
-      return {
-        id: r.id,
-        user_id: r.user_id,
-        role: r.role as InternalRole,
-        name: profile?.name || "Utilisateur",
-        email: profile?.email || null,
-        created_at: r.created_at,
-      };
-    });
-
-    // Deduplicate by user_id, keeping highest role
-    const deduped = new Map<string, TeamMember>();
-    teamMembers.forEach((m) => {
-      const existing = deduped.get(m.user_id);
-      if (!existing || INTERNAL_ROLES.indexOf(m.role) < INTERNAL_ROLES.indexOf(existing.role)) {
-        deduped.set(m.user_id, m);
-      }
-    });
-
-    setMembers(Array.from(deduped.values()));
     setLoading(false);
+  }
+
+  async function loadRequests() {
+    const { data } = await supabase
+      .from("admin_join_requests")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
+    setRequests((data as JoinRequest[]) || []);
   }
 
   useEffect(() => {
     loadMembers();
+    loadRequests();
   }, []);
 
   async function handleInvite(e: React.FormEvent) {
@@ -110,7 +123,6 @@ export default function SuperAdminTeam() {
     setInviting(true);
 
     try {
-      // Look up user by email in profiles
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id")
@@ -118,18 +130,12 @@ export default function SuperAdminTeam() {
         .limit(1);
 
       if (!profiles || profiles.length === 0) {
-        toast({
-          title: "Utilisateur introuvable",
-          description: "Aucun compte avec cet email. L'utilisateur doit d'abord s'inscrire.",
-          variant: "destructive",
-        });
+        toast({ title: "Utilisateur introuvable", description: "Aucun compte avec cet email.", variant: "destructive" });
         setInviting(false);
         return;
       }
 
       const targetUserId = profiles[0].user_id;
-
-      // Check if already has this role
       const existing = members.find((m) => m.user_id === targetUserId && m.role === inviteRole);
       if (existing) {
         toast({ title: "Déjà membre", description: "Cet utilisateur a déjà ce rôle.", variant: "destructive" });
@@ -137,7 +143,6 @@ export default function SuperAdminTeam() {
         return;
       }
 
-      // Get any store_id for this user (needed for the FK constraint)
       const { data: userRoles } = await supabase
         .from("user_roles")
         .select("store_id")
@@ -156,7 +161,6 @@ export default function SuperAdminTeam() {
         store_id: storeId,
         role: inviteRole as any,
       });
-
       if (error) throw error;
 
       toast({ title: "Membre ajouté", description: `${inviteEmail} ajouté comme ${ROLE_LABELS[inviteRole]}` });
@@ -174,15 +178,84 @@ export default function SuperAdminTeam() {
       toast({ title: "Impossible", description: "Vous ne pouvez pas retirer votre propre rôle.", variant: "destructive" });
       return;
     }
-
     const { error } = await supabase.from("user_roles").delete().eq("id", member.id);
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
       return;
     }
-
     toast({ title: "Membre retiré" });
     await loadMembers();
+  }
+
+  async function handleApprove(req: JoinRequest) {
+    setProcessingId(req.id);
+    try {
+      // Get a store_id for this user (needed for FK)
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("store_id")
+        .eq("user_id", req.user_id)
+        .limit(1);
+
+      let storeId = userRoles?.[0]?.store_id;
+
+      // If user has no store, check if they have a profile
+      if (!storeId) {
+        // Create a dummy store_id from an existing store or use a known one
+        // For HQ roles, we need at least one store_id. Use any existing store.
+        const { data: anyStore } = await supabase
+          .from("stores")
+          .select("id")
+          .limit(1);
+        
+        if (!anyStore || anyStore.length === 0) {
+          toast({ title: "Erreur", description: "Aucune boutique trouvée dans le système.", variant: "destructive" });
+          setProcessingId(null);
+          return;
+        }
+        storeId = anyStore[0].id;
+      }
+
+      // Insert role
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        user_id: req.user_id,
+        store_id: storeId,
+        role: req.requested_role as any,
+      });
+      if (roleError) throw roleError;
+
+      // Update request status
+      const { error: updateError } = await supabase
+        .from("admin_join_requests")
+        .update({ status: "approved", reviewed_by: user?.id })
+        .eq("id", req.id);
+      if (updateError) throw updateError;
+
+      toast({ title: "Demande approuvée", description: `${req.name} est maintenant ${req.requested_role}` });
+      await Promise.all([loadMembers(), loadRequests()]);
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function handleReject(req: JoinRequest) {
+    setProcessingId(req.id);
+    try {
+      const { error } = await supabase
+        .from("admin_join_requests")
+        .update({ status: "rejected", reviewed_by: user?.id })
+        .eq("id", req.id);
+      if (error) throw error;
+
+      toast({ title: "Demande refusée" });
+      await loadRequests();
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setProcessingId(null);
+    }
   }
 
   if (loading) return <p className="text-muted-foreground">Chargement...</p>;
@@ -194,6 +267,70 @@ export default function SuperAdminTeam() {
         <p className="text-sm text-muted-foreground">{members.length} membre(s) interne(s)</p>
       </div>
 
+      {/* Pending requests */}
+      {requests.length > 0 && (
+        <Card className="border-amber-500/30">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-500" />
+              Demandes en attente ({requests.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-muted-foreground">Nom</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground">Email</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground">Rôle demandé</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((req) => (
+                    <tr key={req.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="p-3 font-medium">{req.name}</td>
+                      <td className="p-3 text-muted-foreground">{req.email}</td>
+                      <td className="p-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[req.requested_role as InternalRole] || "bg-muted text-muted-foreground"}`}>
+                          {ROLE_LABELS[req.requested_role as InternalRole] || req.requested_role}
+                        </span>
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {new Date(req.created_at).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td className="p-3 text-right space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                          onClick={() => handleApprove(req)}
+                          disabled={processingId === req.id}
+                        >
+                          {processingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => handleReject(req)}
+                          disabled={processingId === req.id}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add member */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Ajouter un membre</CardTitle>
@@ -209,9 +346,7 @@ export default function SuperAdminTeam() {
               required
             />
             <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as InternalRole)}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {INTERNAL_ROLES.map((r) => (
                   <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
@@ -226,6 +361,7 @@ export default function SuperAdminTeam() {
         </CardContent>
       </Card>
 
+      {/* Members list */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -267,9 +403,7 @@ export default function SuperAdminTeam() {
                 ))}
                 {members.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                      Aucun membre interne
-                    </td>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">Aucun membre interne</td>
                   </tr>
                 )}
               </tbody>
