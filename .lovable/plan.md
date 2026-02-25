@@ -1,67 +1,96 @@
 
 
-# Analyse objective : le RBAC client est-il critique pour le MVP ?
+# Analyse : Flux d'inscription des membres d'equipe
 
-## Constat actuel
+## Etat actuel
 
-**OUI, le probleme est reel et doit etre corrige avant le lancement.**
+### Cote boutique (store team)
+Le flux est **deja correct** dans sa logique de base :
+1. L'admin invite par email via la page Team → insertion dans `team_invitations` + appel `send-invitation`
+2. Le trigger `handle_invited_user` sur `auth.users` detecte l'email a l'inscription et assigne automatiquement le `store_id` + `role`
+3. L'utilisateur est redirige vers le dashboard avec le bon role
 
-Voici les faits verifies dans le code :
+**Ce qui manque** : le trigger `handle_invited_user` existe comme fonction mais **n'est pas attache comme trigger** (la section `db-triggers` indique "There are no triggers in the database"). C'est un blocage critique -- le mecanisme d'auto-assignation ne fonctionne pas actuellement.
 
-1. **`buildAppUser` (AuthContext.tsx, ligne 35)** : la requete sur `user_roles` ne selectionne que `store_id`. Le role (`admin`, `caller`, `preparateur`, `livreur`) est ignore.
+### Cote Intramate HQ
+Le composant `SuperAdminTeam.tsx` permet d'ajouter un membre interne, mais **uniquement si son compte existe deja**. Il n'y a pas de flux d'invitation ni d'approbation.
 
-2. **`ProtectedRoute` (App.tsx)** : verifie uniquement `isAuthenticated` et `has_completed_onboarding`. Aucune verification de role.
+## Evaluation de ta logique
 
-3. **`DashboardSidebar`** : affiche toutes les entrees de menu (Billing, Settings, Team, Modules) a tous les utilisateurs connectes, quel que soit leur role.
+Ta proposition est **coherente et bien pensee**. Voici mon analyse :
 
-**Consequence concrete** : un livreur invite dans une boutique peut acceder a `/dashboard/billing`, `/dashboard/settings`, `/dashboard/team` et `/dashboard/modules`. Meme si les donnees sont protegees cote serveur par RLS, l'utilisateur voit des pages auxquelles il ne devrait pas avoir acces -- ce qui est inacceptable pour un produit en production.
-
-## Nuance importante
-
-La securite des **donnees** n'est pas en danger : les politiques RLS sur les tables `invoices`, `team_invitations`, `store_modules` bloquent deja les operations non autorisees cote serveur. Ce qui manque, c'est la **securite de l'interface** (defense en profondeur + UX correcte).
+| Point | Verdict |
+|---|---|
+| Boutique : invitation-only avec role predefini par l'admin | Deja le design actuel. Le trigger manquant doit etre cree |
+| HQ : invitation par superadmin | Logique, meme pattern que la boutique |
+| HQ : auto-inscription avec choix de role + validation | Bonne idee pour simplifier l'onboarding HQ, mais necessite une table de demandes en attente |
 
 ## Plan d'implementation
 
-### Etape 1 : Ajouter `role` dans AuthContext
+### Etape 1 : Creer le trigger manquant sur `auth.users`
 
-- Modifier la requete `user_roles` : `.select("store_id, role")` au lieu de `.select("store_id")`
-- Extraire `role` : `const role = roles?.[0]?.role ?? null`
-- Ajouter `role: string | null` dans l'interface `AppUser` et dans l'objet retourne
+La fonction `handle_invited_user()` existe deja en base. Il faut simplement creer le trigger qui l'appelle :
 
-### Etape 2 : Creer un `ProtectedRoute` avec controle de role
+```sql
+CREATE TRIGGER on_auth_user_created_check_invites
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_invited_user();
+```
 
-- Ajouter une prop optionnelle `allowedRoles?: string[]`
-- Si `allowedRoles` est fourni et que `user.role` n'est pas dedans, rediriger vers `/dashboard`
-- Les routes sans `allowedRoles` restent accessibles a tous les utilisateurs authentifies
+Cela corrige le flux boutique : un membre invite sera automatiquement rattache a son `store_id` et son `role` des son inscription.
 
-### Etape 3 : Securiser les routes dans App.tsx
+### Etape 2 : Creer une table `admin_join_requests` pour les demandes HQ
 
-| Route | Roles autorises |
-|---|---|
-| `/dashboard/billing` | admin |
-| `/dashboard/settings` | admin |
-| `/dashboard/team` | admin |
-| `/dashboard/modules` | admin |
-| `/dashboard/workspace/caller` | admin, caller |
-| `/dashboard/workspace/preparateur` | admin, preparateur |
-| `/dashboard/workspace/livreur` | admin, livreur |
-| `/dashboard`, `/dashboard/orders`, `/dashboard/products`, `/dashboard/customers`, `/dashboard/deliveries`, `/dashboard/stats`, `/dashboard/help` | tous les roles |
+Pour permettre l'auto-inscription avec validation :
 
-### Etape 4 : Masquer les liens non autorises dans la Sidebar
+```sql
+CREATE TABLE public.admin_join_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  email text NOT NULL,
+  name text NOT NULL,
+  requested_role text NOT NULL DEFAULT 'support',
+  status text NOT NULL DEFAULT 'pending', -- pending, approved, rejected
+  reviewed_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+```
 
-- Ajouter une prop `requiredRoles?: string[]` aux items de la sidebar
-- Si le role de l'utilisateur n'est pas dans la liste, masquer l'entree (pas juste la verrouiller)
-- Cela evite la confusion : un livreur ne voit que les pages qui le concernent
+Avec des politiques RLS appropriees (superadmins peuvent tout voir/modifier, l'utilisateur peut voir sa propre demande).
 
-### Fichiers modifies
+### Etape 3 : Ajouter un formulaire de demande d'acces HQ
 
-- `src/contexts/AuthContext.tsx` -- ajout du role
-- `src/App.tsx` -- ProtectedRoute avec allowedRoles + routes securisees
-- `src/components/dashboard/DashboardSidebar.tsx` -- masquage conditionnel des liens
+Sur la page `/admin/login`, ajouter un lien "Demander un acces" qui ouvre un formulaire :
+- Email (pre-rempli si connecte)
+- Nom
+- Role souhaite (support, finance, developer)
+- Bouton "Soumettre la demande"
 
-### Ce qui ne change PAS
+L'utilisateur voit un message "Votre demande est en attente de validation" tant que le statut est `pending`.
 
-- Aucune migration de base de donnees (la colonne `role` existe deja dans `user_roles`)
-- Aucune modification RLS (la securite serveur est deja en place)
-- Aucun changement de design ou de fonctionnalite
+### Etape 4 : Ajouter la validation dans SuperAdminTeam
+
+Dans le composant `SuperAdminTeam.tsx`, ajouter une section "Demandes en attente" :
+- Liste des demandes `pending`
+- Boutons "Approuver" (insere dans `user_roles` avec le role demande) et "Rejeter"
+- Notification au demandeur (optionnel, phase suivante)
+
+### Etape 5 : Bloquer l'acces HQ tant que la demande n'est pas approuvee
+
+Dans le flux d'authentification admin (`AdminLogin.tsx` / `SuperAdmin.tsx`), verifier que l'utilisateur a bien un role interne dans `user_roles` avant de lui donner acces. S'il a une demande `pending`, afficher "En attente de validation".
+
+## Fichiers concernes
+
+- **Migration SQL** : trigger sur `auth.users` + table `admin_join_requests` + politiques RLS
+- `src/pages/AdminLogin.tsx` : ajout lien "Demander un acces" + formulaire
+- `src/components/superadmin/SuperAdminTeam.tsx` : section demandes en attente + actions approuver/rejeter
+- `src/pages/SuperAdmin.tsx` : verification du statut de demande
+
+## Ce qui ne change pas
+
+- Le flux d'invitation boutique (deja correct, juste le trigger a activer)
+- Le design general
+- Les roles existants et les RLS en place
 
