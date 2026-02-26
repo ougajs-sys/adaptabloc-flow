@@ -41,7 +41,9 @@ import SuperAdminActivity from "./components/superadmin/SuperAdminActivity";
 import SuperAdminTeam from "./components/superadmin/SuperAdminTeam";
 import SuperAdminTickets from "./components/superadmin/SuperAdminTickets";
 import SuperAdminConfig from "./components/superadmin/SuperAdminConfig";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,44 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  return <>{children}</>;
+}
+
+const ADMIN_ROLES = ["superadmin", "support", "finance", "developer"];
+
+function SuperAdminRoute({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [authorized, setAuthorized] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || !user) {
+      setChecking(false);
+      return;
+    }
+    async function check() {
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user!.id);
+      const hasAdmin = roles?.some((r) => ADMIN_ROLES.includes(r.role));
+      setAuthorized(!!hasAdmin);
+      setChecking(false);
+    }
+    check();
+  }, [isLoading, isAuthenticated, user]);
+
+  if (isLoading || checking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
+  if (!authorized) return <Navigate to="/admin/login" replace />;
 
   return <>{children}</>;
 }
@@ -90,7 +130,7 @@ const AppRoutes = () => (
     {/* Admin HQ - login is standalone */}
     <Route path="/admin/login" element={<AdminLogin />} />
     {/* Admin HQ - workspace with layout */}
-    <Route path="/admin" element={<SuperAdminLayout />}>
+    <Route path="/admin" element={<SuperAdminRoute><SuperAdminLayout /></SuperAdminRoute>}>
       <Route index element={<Navigate to="/admin/overview" replace />} />
       <Route path="overview" element={<SuperAdminOverview />} />
       <Route path="stores" element={<SuperAdminStores />} />

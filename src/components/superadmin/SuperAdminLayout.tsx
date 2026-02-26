@@ -1,54 +1,10 @@
-import { useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { Outlet } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import SuperAdminSidebar from "./SuperAdminSidebar";
 import AdminNotifications from "./AdminNotifications";
 
-const ADMIN_ROLES = ["superadmin", "support", "finance", "developer"];
-
 export default function SuperAdminLayout() {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const [authorized, setAuthorized] = useState(false);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      navigate("/admin/login", { replace: true });
-      return;
-    }
-
-    async function check() {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-
-      const hasAdmin = roles?.some((r) => ADMIN_ROLES.includes(r.role));
-      if (!hasAdmin) {
-        navigate("/admin/login", { replace: true });
-        return;
-      }
-      setAuthorized(true);
-      setChecking(false);
-    }
-    check();
-  }, [isLoading, isAuthenticated, user]);
-
-  if (isLoading || checking) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Chargement...</p>
-      </div>
-    );
-  }
-
-  if (!authorized) return null;
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
