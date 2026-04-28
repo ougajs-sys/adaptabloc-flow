@@ -4,6 +4,7 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { TrustBar } from "@/components/landing/TrustBar";
 import { WorkflowSection } from "@/components/landing/WorkflowSection";
 import { DashboardPreview } from "@/components/landing/DashboardPreview";
+import { OnboardingDemoSection } from "@/components/landing/OnboardingDemoSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { AfricaMapSection } from "@/components/landing/AfricaMapSection";
 import { StatsSection } from "@/components/landing/StatsSection";
@@ -20,6 +21,7 @@ const Landing = () => {
       <TrustBar />
       <WorkflowSection />
       <DashboardPreview />
+      <OnboardingDemoSection />
       <FeaturesSection />
       <AfricaMapSection />
       <StatsSection />

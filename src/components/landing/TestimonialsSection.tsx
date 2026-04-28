@@ -6,8 +6,7 @@ const testimonials = [
     name: "Aïcha Traoré",
     role: "Fondatrice, Maïmouna Boutique",
     location: "Abidjan, Côte d'Ivoire",
-    avatar: "AT",
-    avatarBg: "from-primary to-[hsl(280,80%,55%)]",
+    photo: "https://i.pravatar.cc/88?img=44",
     quote:
       "Avant Intramate, je perdais 3 commandes par jour à cause des appels manqués. Maintenant mes callers gèrent tout sur leur téléphone, et je vois le pipeline en temps réel.",
     metric: { value: "+40%", label: "Taux de confirmation" },
@@ -17,8 +16,7 @@ const testimonials = [
     name: "Mamadou Diallo",
     role: "CEO, FastDelivery 225",
     location: "Yopougon, Côte d'Ivoire",
-    avatar: "MD",
-    avatarBg: "from-accent to-[hsl(168,80%,35%)]",
+    photo: "https://i.pravatar.cc/88?img=33",
     quote:
       "On gère 12 livreurs sur 4 quartiers. Le module géolocalisation nous a permis de passer de 65% à 92% de livraisons réussies. Le ROI a été immédiat.",
     metric: { value: "92%", label: "Livraisons réussies" },
@@ -28,8 +26,7 @@ const testimonials = [
     name: "Fatou Diop",
     role: "Directrice, Xessal Cosmétiques",
     location: "Dakar, Sénégal",
-    avatar: "FD",
-    avatarBg: "from-[hsl(38,95%,55%)] to-[hsl(20,95%,55%)]",
+    photo: "https://i.pravatar.cc/88?img=56",
     quote:
       "L'iframe sur ma landing page me ramène 30 commandes par jour. Et avec les campagnes WhatsApp, mes clientes reviennent toutes les semaines.",
     metric: { value: "30/jour", label: "Commandes via iframe" },
@@ -118,11 +115,11 @@ export const TestimonialsSection = () => {
 
                 {/* Author */}
                 <div className="flex items-center gap-3 pt-4 border-t border-border/40">
-                  <div
-                    className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.avatarBg} flex items-center justify-center text-white font-bold text-sm shadow-md`}
-                  >
-                    {t.avatar}
-                  </div>
+                  <img
+                    src={t.photo}
+                    alt={t.name}
+                    className="w-11 h-11 rounded-full object-cover shadow-md ring-2 ring-border"
+                  />
                   <div>
                     <p className="text-sm font-semibold text-foreground">{t.name}</p>
                     <p className="text-[11px] text-muted-foreground">{t.role}</p>

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Sparkles,
@@ -13,8 +14,35 @@ import {
   Package,
 } from "lucide-react";
 
-// Mini animated bar chart used inside the dashboard mockup
 const chartData = [42, 68, 51, 89, 73, 95, 110, 128];
+
+function CountUpKpi({
+  end,
+  format,
+  delay = 600,
+}: {
+  end: number;
+  format?: (n: number) => string;
+  delay?: number;
+}) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const start = Date.now();
+      const dur = 1800;
+      const frame = () => {
+        const p = Math.min((Date.now() - start) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        setVal(eased * end);
+        if (p < 1) requestAnimationFrame(frame);
+        else setVal(end);
+      };
+      requestAnimationFrame(frame);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [end, delay]);
+  return <>{format ? format(val) : Math.round(val).toLocaleString("fr-FR")}</>;
+}
 
 export const HeroSection = () => {
   return (
@@ -170,7 +198,8 @@ export const HeroSection = () => {
                     {
                       icon: ShoppingCart,
                       label: "Commandes",
-                      value: "847",
+                      rawValue: 847,
+                      format: undefined,
                       delta: "+12%",
                       color: "text-primary",
                       bg: "bg-primary/10",
@@ -178,7 +207,8 @@ export const HeroSection = () => {
                     {
                       icon: Users,
                       label: "Clients",
-                      value: "1 240",
+                      rawValue: 1240,
+                      format: undefined,
                       delta: "+8%",
                       color: "text-accent",
                       bg: "bg-accent/10",
@@ -186,7 +216,8 @@ export const HeroSection = () => {
                     {
                       icon: TrendingUp,
                       label: "CA / mois",
-                      value: "4.2M",
+                      rawValue: 4.2,
+                      format: (n: number) => `${n.toFixed(1)}M`,
                       delta: "+24%",
                       color: "text-[hsl(280,80%,55%)]",
                       bg: "bg-[hsl(280,80%,55%)]/10",
@@ -207,7 +238,11 @@ export const HeroSection = () => {
                       </div>
                       <p className="text-[10px] text-muted-foreground">{kpi.label}</p>
                       <p className="text-base font-bold text-foreground font-[Space_Grotesk]">
-                        {kpi.value}
+                        <CountUpKpi
+                          end={kpi.rawValue}
+                          format={kpi.format}
+                          delay={700 + i * 100}
+                        />
                       </p>
                     </motion.div>
                   ))}

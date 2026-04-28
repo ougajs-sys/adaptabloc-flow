@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
 import {
   ShoppingCart,
   Phone,
@@ -8,48 +9,63 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+function MetricCounter({ target }: { target: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true });
+
+  useEffect(() => {
+    if (!isInView) return;
+    const start = Date.now();
+    const dur = 1600;
+    const frame = () => {
+      const p = Math.min((Date.now() - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setCount(Math.round(eased * target));
+      if (p < 1) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }, [isInView, target]);
+
+  return <span ref={ref}>{count}</span>;
+}
+
 const stages = [
   {
     role: "Caller",
-    name: "Awa",
-    avatar: "A",
-    color: "primary",
+    name: "Awa Koné",
+    photo: "https://i.pravatar.cc/88?img=47",
     icon: Phone,
     title: "Confirme la commande",
     description: "Reçoit la commande, appelle le client, valide l'adresse.",
-    metrics: { label: "Confirmations / jour", value: "84" },
+    metrics: { label: "Confirmations / jour", value: 84 },
     bgClass: "bg-primary/10",
     borderClass: "border-primary/30",
     textClass: "text-primary",
-    avatarBg: "bg-gradient-to-br from-primary to-[hsl(280,80%,55%)]",
   },
   {
     role: "Préparateur",
-    name: "Mamadou",
-    avatar: "M",
-    color: "amber",
+    name: "Mamadou Sow",
+    photo: "https://i.pravatar.cc/88?img=12",
     icon: Package,
     title: "Prépare le colis",
     description: "Ramasse les articles, scanne, conditionne, signale prêt.",
-    metrics: { label: "Colis prêts / jour", value: "76" },
+    metrics: { label: "Colis prêts / jour", value: 76 },
     bgClass: "bg-[hsl(38,95%,55%)]/10",
     borderClass: "border-[hsl(38,95%,55%)]/30",
     textClass: "text-[hsl(38,95%,55%)]",
-    avatarBg: "bg-gradient-to-br from-[hsl(38,95%,55%)] to-[hsl(20,95%,55%)]",
   },
   {
     role: "Livreur",
-    name: "Fatou",
-    avatar: "F",
-    color: "accent",
+    name: "Fatou Ba",
+    photo: "https://i.pravatar.cc/88?img=26",
     icon: Truck,
     title: "Livre au client",
     description: "Récupère, navigue avec Google Maps, encaisse, marque livré.",
-    metrics: { label: "Livraisons / jour", value: "68" },
+    metrics: { label: "Livraisons / jour", value: 68 },
     bgClass: "bg-accent/10",
     borderClass: "border-accent/30",
     textClass: "text-accent",
-    avatarBg: "bg-gradient-to-br from-accent to-[hsl(168,80%,35%)]",
   },
 ];
 
@@ -147,11 +163,11 @@ export const WorkflowSection = () => {
                 >
                   {/* Header */}
                   <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className={`w-12 h-12 rounded-xl ${stage.avatarBg} flex items-center justify-center shadow-lg text-white font-bold text-base`}
-                    >
-                      {stage.avatar}
-                    </div>
+                    <img
+                      src={stage.photo}
+                      alt={stage.name}
+                      className="w-12 h-12 rounded-xl object-cover shadow-lg ring-2 ring-border"
+                    />
                     <div>
                       <p className={`text-[10px] font-bold uppercase tracking-wider ${stage.textClass}`}>
                         {stage.role}
@@ -192,7 +208,7 @@ export const WorkflowSection = () => {
                   <div className="flex items-center justify-between pt-3 border-t border-border/40">
                     <span className="text-[10px] text-muted-foreground">{stage.metrics.label}</span>
                     <span className={`text-base font-bold ${stage.textClass} font-[Space_Grotesk]`}>
-                      {stage.metrics.value}
+                      <MetricCounter target={stage.metrics.value} />
                     </span>
                   </div>
                 </div>
