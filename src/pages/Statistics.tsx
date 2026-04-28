@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,7 +61,7 @@ export default function Statistics() {
       if (!storeId) return [];
       let q = supabase
         .from("orders")
-        .select("id, status, total_amount, created_at, confirmed_by, prepared_by")
+        .select("id, status, total_amount, created_at, updated_at, confirmed_by, prepared_by")
         .eq("store_id", storeId);
       if (cutoff) q = q.gte("created_at", cutoff);
       const { data } = await q.order("created_at", { ascending: false });
@@ -95,7 +95,21 @@ export default function Statistics() {
     enabled: !!storeId,
   });
 
-  const isLoading = ordersLoading || teamLoading;
+  // Fetch deliveries for driver metrics
+  const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery({
+    queryKey: ["stats-deliveries", storeId],
+    queryFn: async () => {
+      if (!storeId) return [];
+      const { data } = await supabase
+        .from("deliveries")
+        .select("driver_id, status")
+        .eq("store_id", storeId);
+      return data || [];
+    },
+    enabled: !!storeId,
+  });
+
+  const isLoading = ordersLoading || teamLoading || deliveriesLoading;
 
   // ── KPI calculations ──
   const kpis = useMemo(() => {
@@ -118,12 +132,21 @@ export default function Statistics() {
         ? Math.round(delivered.reduce((s, o) => s + (o.total_amount || 0), 0) / delivered.length)
         : 0;
 
-    // Avg time between order creation and confirmation (hours)
-    const confirmedOrders = orders.filter((o) =>
-      ["confirmed", "preparing", "ready", "in_transit", "delivered"].includes(o.status)
-    );
-    // We don't have confirmed_at timestamp, so we estimate based on updated_at vs created_at
-    const avgPrepHours = confirmedOrders.length > 0 ? 1.8 : 0;
+    // Avg time from order creation to confirmation, approximated via updated_at
+    const confirmedOrders = orders.filter((o) => o.confirmed_by && (o as any).updated_at);
+    const avgPrepHours =
+      confirmedOrders.length > 0
+        ? Math.round(
+            (confirmedOrders.reduce((sum, o) => {
+              const diffH =
+                (new Date((o as any).updated_at).getTime() - new Date(o.created_at).getTime()) /
+                3_600_000;
+              return sum + Math.min(Math.max(0, diffH), 72);
+            }, 0) /
+              confirmedOrders.length) *
+              10
+          ) / 10
+        : 0;
 
     return { confirmationRate, deliveryRate, avgBasket, avgPrepHours, total };
   }, [orders]);
@@ -168,8 +191,9 @@ export default function Statistics() {
       } else if (m.role === "preparer") {
         count = orders.filter((o) => o.prepared_by === m.userId).length;
       } else if (m.role === "driver") {
-        // Count delivered/returned orders — would need deliveries table, approximate with 0
-        count = 0;
+        count = deliveries.filter(
+          (d) => d.driver_id === m.userId && ["delivered", "failed"].includes(d.status)
+        ).length;
       }
       return {
         name: m.name.split(" ")[0],
@@ -178,14 +202,16 @@ export default function Statistics() {
         role: m.role,
       };
     });
-  }, [teamMembers, orders]);
+  }, [teamMembers, orders, deliveries]);
 
   // ── Driver table ──
   const drivers = useMemo(() => {
     return teamMembers
       .filter((m) => m.role === "driver")
       .map((m) => {
-        const handled = 0; // Would need deliveries join
+        const handled = deliveries.filter(
+          (d) => d.driver_id === m.userId && ["delivered", "failed"].includes(d.status)
+        ).length;
         return {
           id: m.userId,
           name: m.name,
@@ -193,7 +219,7 @@ export default function Statistics() {
           badge: handled >= 40 ? "Excellent" : handled >= 25 ? "Bon" : "À suivre",
         };
       });
-  }, [teamMembers]);
+  }, [teamMembers, deliveries]);
 
   const periodSelector = (
     <Select value={period} onValueChange={setPeriod}>
