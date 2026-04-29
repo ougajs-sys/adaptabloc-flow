@@ -55,10 +55,10 @@ const mainItems: SidebarItem[] = [
   { title: "Clients", url: "/dashboard/customers", icon: Users },
   { title: "Produits", url: "/dashboard/products", icon: Package },
   { title: "Livraisons", url: "/dashboard/deliveries", icon: Truck },
-  { title: "Équipe", url: "/dashboard/team", icon: UsersRound, requiredRoles: ["admin"] },
 ];
 
 const workspaceItems: SidebarItem[] = [
+  { title: "Gestion d'équipe", url: "/dashboard/team", icon: UsersRound, requiredRoles: ["admin"] },
   { title: "Espace Caller", url: "/dashboard/workspace/caller", icon: Phone, requiredRoles: ["admin", "caller"] },
   { title: "Espace Préparateur", url: "/dashboard/workspace/preparateur", icon: PackageCheck, requiredRoles: ["admin", "preparer"] },
   { title: "Espace Livreur", url: "/dashboard/workspace/livreur", icon: Truck, requiredRoles: ["admin", "driver"] },
@@ -71,7 +71,7 @@ const toolItems: SidebarItem[] = [
   { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns", requiredRoles: ["admin"] },
   { title: "Templates", url: "/dashboard/templates", icon: Mail, requiredModule: "message_templates", requiredRoles: ["admin"] },
   { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
-  { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredModule: "embed_forms", requiredRoles: ["admin"] },
+  { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredRoles: ["admin"] },
 ];
 
 const bottomItems: SidebarItem[] = [
