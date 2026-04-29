@@ -18,6 +18,7 @@ import { Search, Plus, Package, AlertTriangle, Loader2 } from "lucide-react";
 import { NewProductDialog, type NewProductFormValues } from "@/components/products/NewProductDialog";
 import { EditProductDialog, type EditProductFormValues } from "@/components/products/EditProductDialog";
 import { ProductDetailDialog } from "@/components/products/ProductDetailDialog";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -255,7 +256,33 @@ const Products = () => {
     </AlertDialog>
     <DashboardLayout
       title="Produits"
-      actions={<Button size="sm" className="gap-2" onClick={() => setNewProductOpen(true)}><Plus size={16} /> Ajouter un produit</Button>}
+      actions={
+        <div className="flex items-center gap-2">
+          <ExportButton
+            data={products.map((p) => ({
+              name: p.name,
+              category: p.category,
+              price: p.price,
+              stock: p.stock,
+              max_stock: p.maxStock,
+              status: p.status,
+              variants: p.variants.map((v) => `${v.label}(${v.stock})`).join(" | "),
+            }))}
+            columns={[
+              { key: "name", label: "Produit" },
+              { key: "category", label: "Catégorie" },
+              { key: "price", label: "Prix (FCFA)" },
+              { key: "stock", label: "Stock" },
+              { key: "max_stock", label: "Stock max" },
+              { key: "status", label: "Statut" },
+              { key: "variants", label: "Variantes" },
+            ]}
+            filename="produits"
+            printTitle="Produits Intramate"
+          />
+          <Button size="sm" className="gap-2" onClick={() => setNewProductOpen(true)}><Plus size={16} /> Ajouter un produit</Button>
+        </div>
+      }
     >
       {(lowStock > 0 || outOfStock > 0) && (
         <div className="flex gap-3 flex-wrap">

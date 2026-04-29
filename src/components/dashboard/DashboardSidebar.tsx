@@ -17,6 +17,10 @@ import {
   Phone,
   PackageCheck,
   LogOut,
+  Mail,
+  Tags,
+  Filter,
+  Warehouse,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -62,7 +66,11 @@ const workspaceItems: SidebarItem[] = [
 
 const toolItems: SidebarItem[] = [
   { title: "Statistiques", url: "/dashboard/stats", icon: BarChart3 },
+  { title: "Stock", url: "/dashboard/stock", icon: Warehouse, requiredModule: "stock_auto", requiredRoles: ["admin", "preparer"] },
+  { title: "Segments", url: "/dashboard/segments", icon: Filter, requiredModule: "segmentation", requiredRoles: ["admin"] },
   { title: "Campagnes", url: "/dashboard/campaigns", icon: MessageSquare, requiredModule: "campaigns", requiredRoles: ["admin"] },
+  { title: "Templates", url: "/dashboard/templates", icon: Mail, requiredModule: "message_templates", requiredRoles: ["admin"] },
+  { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
   { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredModule: "embed_forms", requiredRoles: ["admin"] },
 ];
 

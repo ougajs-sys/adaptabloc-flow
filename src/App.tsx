@@ -26,6 +26,11 @@ import Help from "./pages/Help";
 import Campaigns from "./pages/Campaigns";
 import EmbedForms from "./pages/EmbedForms";
 import EmbedOrder from "./pages/EmbedOrder";
+import Templates from "./pages/Templates";
+import CustomStatuses from "./pages/CustomStatuses";
+import Segments from "./pages/Segments";
+import Stock from "./pages/Stock";
+import TrackOrder from "./pages/TrackOrder";
 import SetupAdmin from "./pages/SetupAdmin";
 import AdminLogin from "./pages/AdminLogin";
 import SuperAdminLayout from "./components/superadmin/SuperAdminLayout";
@@ -116,6 +121,11 @@ const AppRoutes = () => (
     <Route path="/dashboard/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
     <Route path="/dashboard/campaigns" element={<ProtectedRoute allowedRoles={["admin"]}><Campaigns /></ProtectedRoute>} />
     <Route path="/dashboard/forms" element={<ProtectedRoute allowedRoles={["admin"]}><EmbedForms /></ProtectedRoute>} />
+    <Route path="/dashboard/templates" element={<ProtectedRoute allowedRoles={["admin"]}><Templates /></ProtectedRoute>} />
+    <Route path="/dashboard/statuses" element={<ProtectedRoute allowedRoles={["admin"]}><CustomStatuses /></ProtectedRoute>} />
+    <Route path="/dashboard/segments" element={<ProtectedRoute allowedRoles={["admin"]}><Segments /></ProtectedRoute>} />
+    <Route path="/dashboard/stock" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><Stock /></ProtectedRoute>} />
+    <Route path="/track/:token" element={<TrackOrder />} />
     <Route path="/dashboard/workspace/caller" element={<ProtectedRoute allowedRoles={["admin", "caller"]}><CallerWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><PreparateurWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute allowedRoles={["admin", "driver"]}><LivreurWorkspace /></ProtectedRoute>} />
