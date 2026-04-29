@@ -1,128 +1,356 @@
 import { Button } from "@/components/ui/button";
-import { Zap, Shield, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { modulesRegistry } from "@/lib/modules-registry";
-import { FloatingBrick } from "./FloatingBrick";
+import { useEffect, useState } from "react";
+import {
+  ArrowRight,
+  Sparkles,
+  TrendingUp,
+  ShoppingCart,
+  Users,
+  Truck,
+  CheckCircle2,
+  Phone,
+  Package,
+} from "lucide-react";
 
-// Select a representative subset of modules for the hero animation
-const heroModules = modulesRegistry.filter(m =>
-  ["dashboard", "orders_basic", "customers_basic", "delivery_basic", "campaigns", "stock_auto", "loyalty", "geo_tracking", "embed_forms", "automations", "multi_store", "ai_assistant"].includes(m.id)
-);
+const chartData = [42, 68, 51, 89, 73, 95, 110, 128];
+
+function CountUpKpi({
+  end,
+  format,
+  delay = 600,
+}: {
+  end: number;
+  format?: (n: number) => string;
+  delay?: number;
+}) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const start = Date.now();
+      const dur = 1800;
+      const frame = () => {
+        const p = Math.min((Date.now() - start) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        setVal(eased * end);
+        if (p < 1) requestAnimationFrame(frame);
+        else setVal(end);
+      };
+      requestAnimationFrame(frame);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [end, delay]);
+  return <>{format ? format(val) : Math.round(val).toLocaleString("fr-FR")}</>;
+}
 
 export const HeroSection = () => {
   return (
-    <section className="relative pt-28 pb-20 overflow-hidden min-h-[90vh] flex items-center">
-      {/* Premium gradient background */}
+    <section className="relative pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden">
+      {/* ── Atmospheric background ── */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-0 left-1/4 w-[900px] h-[700px] bg-primary/12 rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[500px] bg-accent/10 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[hsl(280,80%,55%)]/5 rounded-full blur-[100px]" />
+        {/* Mesh gradient blobs */}
+        <div className="absolute -top-40 left-1/4 w-[700px] h-[700px] bg-primary/20 rounded-full blur-[140px]" />
+        <div className="absolute top-20 right-1/4 w-[500px] h-[500px] bg-accent/15 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[400px] h-[300px] bg-[hsl(280,80%,55%)]/10 rounded-full blur-[100px]" />
+
+        {/* Grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+            maskImage:
+              "radial-gradient(ellipse at top, black 30%, transparent 70%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse at top, black 30%, transparent 70%)",
+          }}
+        />
       </div>
 
       <div className="container mx-auto px-4">
-        <div className="max-w-5xl mx-auto">
-          {/* Text content */}
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
+          {/* ── Text column ── */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="text-center mb-12"
+            transition={{ duration: 0.6 }}
+            className="text-center lg:text-left"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-sm text-primary text-sm font-medium mb-6">
-              <Zap size={14} />
-              14 jours d'essai gratuit — sans carte bancaire
-            </div>
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-sm text-primary text-xs font-semibold mb-6"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              Nouveau · Disponible en Côte d'Ivoire, Sénégal, Cameroun
+            </motion.div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 font-[Space_Grotesk]">
-              Construisez{" "}
-              <span className="bg-gradient-to-r from-primary via-[hsl(280,80%,55%)] to-accent bg-clip-text text-transparent">
-                VOTRE système
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-foreground font-[Space_Grotesk] mb-6 leading-[1.05]">
+              Le système qui{" "}
+              <span className="relative inline-block">
+                <span className="relative z-10 bg-gradient-to-r from-primary via-[hsl(280,80%,55%)] to-accent bg-clip-text text-transparent">
+                  fait grandir
+                </span>
+                <svg
+                  className="absolute -bottom-2 left-0 w-full"
+                  viewBox="0 0 300 12"
+                  fill="none"
+                >
+                  <motion.path
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ delay: 0.8, duration: 1.2 }}
+                    d="M3 8C50 3 150 3 297 8"
+                    stroke="hsl(var(--accent))"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </span>
               <br />
-              brique par brique
+              votre commerce
             </h1>
 
-            <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto leading-relaxed">
-              Le logiciel modulaire qui s'adapte à VOTRE commerce. Choisissez vos modules, configurez en 10 minutes, et concentrez-vous sur ce qui compte : vendre.
+            <p className="text-lg lg:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              Commandes, livraisons, équipe, campagnes, paiements mobiles —
+              <span className="text-foreground font-medium"> un seul outil modulaire</span>{" "}
+              conçu pour les marchands africains.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+            {/* Primary CTAs */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start mb-8">
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  size="lg"
+                  asChild
+                  className="text-base px-7 h-12 rounded-xl bg-gradient-to-r from-primary to-[hsl(280,80%,55%)] hover:opacity-95 text-primary-foreground shadow-xl shadow-primary/30 font-semibold w-full sm:w-auto"
+                >
+                  <Link to="/login" className="flex items-center gap-2">
+                    Démarrer gratuitement
+                    <ArrowRight size={18} />
+                  </Link>
+                </Button>
+              </motion.div>
               <Button
                 size="lg"
+                variant="outline"
                 asChild
-                className="text-base px-8 h-12 text-white border-0 backdrop-blur-sm shadow-lg shadow-[#1877F2]/25"
-                style={{ backgroundColor: "#1877F2" }}
+                className="text-base px-7 h-12 rounded-xl bg-card/50 backdrop-blur-sm border-border/60 w-full sm:w-auto"
               >
-                <Link to="/login" className="flex items-center gap-2">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                  Commencer avec Facebook
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild className="text-base px-8 h-12 backdrop-blur-sm bg-card/50 border-border/50">
-                <a href="#how-it-works">Voir la démo</a>
+                <a href="#workflow" className="flex items-center gap-2">
+                  <Sparkles size={16} className="text-primary" />
+                  Voir la démo
+                </a>
               </Button>
             </div>
 
-            <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Shield size={16} className="text-accent" />
+            {/* Trust indicators */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 justify-center lg:justify-start text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-accent" />
+                <span>14 jours gratuits</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-accent" />
+                <span>Sans carte bancaire</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-accent" />
                 <span>Setup en 10 min</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <BarChart3 size={16} className="text-accent" />
-                <span>+15% de productivité</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-accent" />
-                <span>Zéro formation</span>
               </div>
             </div>
           </motion.div>
 
-          {/* Animated bricks assembly */}
+          {/* ── Visual column: animated dashboard mockup ── */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="relative max-w-3xl mx-auto"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.7 }}
+            className="relative"
           >
-            {/* Glass container for assembled bricks */}
-            <div className="relative rounded-2xl border border-border/40 bg-card/30 backdrop-blur-xl p-8 shadow-2xl shadow-primary/5">
-              {/* Browser dots */}
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-3 h-3 rounded-full bg-destructive/60" />
-                <div className="w-3 h-3 rounded-full bg-[hsl(38,95%,55%)]/60" />
-                <div className="w-3 h-3 rounded-full bg-accent/60" />
-                <span className="ml-3 text-xs text-muted-foreground font-mono">votre-systeme.intramate.app</span>
+            {/* Background glow */}
+            <div className="absolute -inset-8 bg-gradient-to-br from-primary/20 via-transparent to-accent/20 rounded-3xl blur-2xl -z-10" />
+
+            {/* Dashboard window */}
+            <div className="relative rounded-2xl border border-border/60 bg-card/80 backdrop-blur-xl shadow-2xl shadow-primary/10 overflow-hidden">
+              {/* Window chrome */}
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border/60 bg-muted/30">
+                <div className="w-2.5 h-2.5 rounded-full bg-destructive/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[hsl(38,95%,55%)]/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-accent/60" />
+                <span className="ml-3 text-xs text-muted-foreground font-mono truncate">
+                  ma-boutique.intramate.app/dashboard
+                </span>
               </div>
 
-              {/* Bricks grid */}
-              <div className="flex flex-wrap gap-3 justify-center">
-                {heroModules.map((mod, i) => (
-                  <FloatingBrick
-                    key={mod.id}
-                    icon={mod.icon}
-                    name={mod.name}
-                    tier={mod.tier}
-                    index={i}
-                    size="sm"
-                  />
-                ))}
-              </div>
+              {/* Dashboard content */}
+              <div className="p-5 space-y-4">
+                {/* KPI cards */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    {
+                      icon: ShoppingCart,
+                      label: "Commandes",
+                      rawValue: 847,
+                      format: undefined,
+                      delta: "+12%",
+                      color: "text-primary",
+                      bg: "bg-primary/10",
+                    },
+                    {
+                      icon: Users,
+                      label: "Clients",
+                      rawValue: 1240,
+                      format: undefined,
+                      delta: "+8%",
+                      color: "text-accent",
+                      bg: "bg-accent/10",
+                    },
+                    {
+                      icon: TrendingUp,
+                      label: "CA / mois",
+                      rawValue: 4.2,
+                      format: (n: number) => `${n.toFixed(1)}M`,
+                      delta: "+24%",
+                      color: "text-[hsl(280,80%,55%)]",
+                      bg: "bg-[hsl(280,80%,55%)]/10",
+                    },
+                  ].map((kpi, i) => (
+                    <motion.div
+                      key={kpi.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 + i * 0.1 }}
+                      className="rounded-lg border border-border/40 bg-background/60 p-3"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`w-7 h-7 rounded-md ${kpi.bg} flex items-center justify-center`}>
+                          <kpi.icon size={14} className={kpi.color} />
+                        </div>
+                        <span className="text-[10px] text-accent font-semibold">{kpi.delta}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{kpi.label}</p>
+                      <p className="text-base font-bold text-foreground font-[Space_Grotesk]">
+                        <CountUpKpi
+                          end={kpi.rawValue}
+                          format={kpi.format}
+                          delay={700 + i * 100}
+                        />
+                      </p>
+                    </motion.div>
+                  ))}
+                </div>
 
-              {/* Decorative floating particles */}
-              <motion.div
-                animate={{ y: [-5, 5, -5] }}
-                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                className="absolute -top-4 -right-4 w-8 h-8 rounded-lg bg-primary/20 backdrop-blur-sm border border-primary/10"
-              />
-              <motion.div
-                animate={{ y: [5, -5, 5] }}
-                transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-                className="absolute -bottom-3 -left-3 w-6 h-6 rounded-lg bg-accent/20 backdrop-blur-sm border border-accent/10"
-              />
+                {/* Mini chart */}
+                <div className="rounded-lg border border-border/40 bg-background/60 p-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-foreground">
+                      Revenus 7 derniers jours
+                    </p>
+                    <span className="text-[10px] text-accent font-medium">↗ 24% vs semaine dernière</span>
+                  </div>
+                  <div className="flex items-end gap-1.5 h-20">
+                    {chartData.map((v, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ height: 0 }}
+                        animate={{ height: `${(v / 128) * 100}%` }}
+                        transition={{ delay: 0.8 + i * 0.06, duration: 0.5 }}
+                        className={`flex-1 rounded-t-sm bg-gradient-to-t ${
+                          i === chartData.length - 1
+                            ? "from-primary to-accent"
+                            : "from-primary/40 to-primary/60"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent orders mini-list */}
+                <div className="rounded-lg border border-border/40 bg-background/60 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-foreground">Commandes en cours</p>
+                    <span className="text-[10px] text-muted-foreground">temps réel</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      { id: "CMD-2841", name: "Awa K.", status: "Confirmée", icon: Phone, color: "text-primary" },
+                      { id: "CMD-2842", name: "Mamadou S.", status: "Préparation", icon: Package, color: "text-[hsl(38,95%,55%)]" },
+                      { id: "CMD-2843", name: "Fatou D.", status: "En route", icon: Truck, color: "text-accent" },
+                    ].map((o, i) => (
+                      <motion.div
+                        key={o.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 1.3 + i * 0.15 }}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span className="font-mono text-[10px] text-muted-foreground w-16">
+                          {o.id}
+                        </span>
+                        <span className="flex-1 font-medium text-foreground truncate">
+                          {o.name}
+                        </span>
+                        <div className={`flex items-center gap-1 ${o.color}`}>
+                          <o.icon size={11} />
+                          <span className="text-[10px] font-medium">{o.status}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Floating notification cards */}
+            <motion.div
+              initial={{ opacity: 0, x: 20, y: 10 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ delay: 1.5 }}
+              className="absolute -right-3 top-20 hidden md:block"
+            >
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-xl px-3 py-2.5 flex items-center gap-2.5"
+              >
+                <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center">
+                  <CheckCircle2 size={16} className="text-accent" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Livraison réussie</p>
+                  <p className="text-[10px] text-muted-foreground">Awa K. · 12 500 F</p>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20, y: 10 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ delay: 1.7 }}
+              className="absolute -left-4 bottom-24 hidden md:block"
+            >
+              <motion.div
+                animate={{ y: [0, 6, 0] }}
+                transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+                className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-xl px-3 py-2.5 flex items-center gap-2.5"
+              >
+                <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Sparkles size={16} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">+24 nouvelles commandes</p>
+                  <p className="text-[10px] text-muted-foreground">depuis ce matin</p>
+                </div>
+              </motion.div>
+            </motion.div>
           </motion.div>
         </div>
       </div>

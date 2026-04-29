@@ -2,25 +2,23 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Settings, Server, Database, Globe } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Settings, Server, Database } from "lucide-react";
 
 export default function SuperAdminConfig() {
-  const [stats, setStats] = useState({
-    totalStores: 0,
-    totalUsers: 0,
-    totalModules: 0,
-  });
-  const [maintenance, setMaintenance] = useState(
-    () => localStorage.getItem("intramate_maintenance") === "true"
-  );
+  const { toast } = useToast();
+  const [stats, setStats] = useState({ totalStores: 0, totalUsers: 0, totalModules: 0 });
+  const [maintenance, setMaintenance] = useState(false);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [storesRes, profilesRes, modulesRes] = await Promise.all([
+      const [storesRes, profilesRes, modulesRes, configRes] = await Promise.all([
         supabase.from("stores").select("id", { count: "exact", head: true }),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("store_modules").select("id", { count: "exact", head: true }),
+        supabase.from("platform_config" as any).select("key, value").eq("key", "maintenance_mode").maybeSingle(),
       ]);
 
       setStats({
@@ -28,14 +26,34 @@ export default function SuperAdminConfig() {
         totalUsers: profilesRes.count || 0,
         totalModules: modulesRes.count || 0,
       });
+
+      if (configRes.data) {
+        setMaintenance((configRes.data as any).value === "true");
+      }
+
       setLoading(false);
     }
     load();
   }, []);
 
-  function toggleMaintenance(val: boolean) {
+  async function toggleMaintenance(val: boolean) {
     setMaintenance(val);
-    localStorage.setItem("intramate_maintenance", String(val));
+    setSavingMaintenance(true);
+    try {
+      const { error } = await supabase
+        .from("platform_config" as any)
+        .upsert({ key: "maintenance_mode", value: String(val) }, { onConflict: "key" });
+      if (error) throw error;
+      toast({
+        title: val ? "Mode maintenance activé" : "Mode maintenance désactivé",
+        description: "Le changement est enregistré en base de données.",
+      });
+    } catch (err: any) {
+      setMaintenance(!val);
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingMaintenance(false);
+    }
   }
 
   if (loading) return <p className="text-muted-foreground">Chargement...</p>;
@@ -102,10 +120,14 @@ export default function SuperAdminConfig() {
               <div>
                 <p className="text-sm">Activer le mode maintenance</p>
                 <p className="text-xs text-muted-foreground">
-                  Les clients verront un message de maintenance (MVP : localStorage uniquement)
+                  Persisté en base de données — visible par tous les administrateurs.
                 </p>
               </div>
-              <Switch checked={maintenance} onCheckedChange={toggleMaintenance} />
+              <Switch
+                checked={maintenance}
+                onCheckedChange={toggleMaintenance}
+                disabled={savingMaintenance}
+              />
             </div>
           </CardContent>
         </Card>

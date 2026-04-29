@@ -172,13 +172,27 @@ function GeneralTab() {
 
 /* ───── Notifications Tab ───── */
 function NotificationsTab() {
-  const [notifNewOrder, setNotifNewOrder] = useState(true);
-  const [notifOrderStatus, setNotifOrderStatus] = useState(true);
-  const [notifLowStock, setNotifLowStock] = useState(false);
-  const [notifTeam, setNotifTeam] = useState(true);
-  const [emailDigest, setEmailDigest] = useState("daily");
+  const { user } = useAuth();
+  const storageKey = `notif_prefs_${user?.store_id ?? "default"}`;
+
+  const loadPrefs = () => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saved = loadPrefs();
+  const [notifNewOrder, setNotifNewOrder] = useState<boolean>(saved?.notifNewOrder ?? true);
+  const [notifOrderStatus, setNotifOrderStatus] = useState<boolean>(saved?.notifOrderStatus ?? true);
+  const [notifLowStock, setNotifLowStock] = useState<boolean>(saved?.notifLowStock ?? false);
+  const [notifTeam, setNotifTeam] = useState<boolean>(saved?.notifTeam ?? true);
+  const [emailDigest, setEmailDigest] = useState<string>(saved?.emailDigest ?? "daily");
 
   const handleSave = () => {
+    localStorage.setItem(storageKey, JSON.stringify({ notifNewOrder, notifOrderStatus, notifLowStock, notifTeam, emailDigest }));
     toast({ title: "Notifications mises à jour" });
   };
 
@@ -376,8 +390,20 @@ function BillingTab() {
 
 /* ───── Appearance Tab ───── */
 function AppearanceTab() {
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
-  const [compactMode, setCompactMode] = useState(false);
+  const STORAGE_KEY = "appearance_prefs";
+
+  const loadAppearance = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const savedAppearance = loadAppearance();
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(savedAppearance?.theme ?? "light");
+  const [compactMode, setCompactMode] = useState<boolean>(savedAppearance?.compactMode ?? false);
 
   const applyTheme = (t: "light" | "dark" | "system") => {
     setTheme(t);
@@ -390,7 +416,13 @@ function AppearanceTab() {
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       root.classList.toggle("dark", prefersDark);
     }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: t, compactMode }));
     toast({ title: "Thème mis à jour" });
+  };
+
+  const toggleCompact = (val: boolean) => {
+    setCompactMode(val);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme, compactMode: val }));
   };
 
   return (
@@ -434,7 +466,7 @@ function AppearanceTab() {
               <p className="text-sm font-medium text-foreground">Mode compact</p>
               <p className="text-xs text-muted-foreground">Réduit l'espacement pour afficher plus de données.</p>
             </div>
-            <Switch checked={compactMode} onCheckedChange={setCompactMode} />
+            <Switch checked={compactMode} onCheckedChange={toggleCompact} />
           </div>
         </CardContent>
       </Card>

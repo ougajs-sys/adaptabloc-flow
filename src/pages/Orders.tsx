@@ -112,7 +112,7 @@ const Orders = () => {
         items,
         total: o.total_amount,
         status: mapDbStatus(o.status),
-        paymentStatus: "pending", // TODO: add payment_status column
+        paymentStatus: o.payment_status || "pending",
         date: o.created_at,
         address: o.shipping_address || "",
         assignee: undefined,
@@ -226,6 +226,7 @@ const Orders = () => {
     await supabase.from("orders").update({
       shipping_address: values.address,
       total_amount: totalAmount,
+      payment_status: values.paymentStatus,
     }).eq("id", editingOrder.dbId);
 
     // Replace order items
