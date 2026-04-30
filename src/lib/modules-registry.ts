@@ -362,16 +362,16 @@ export const modulesRegistry: ModuleDefinition[] = [
     available: false,
   },
 
-  // === TIER 2 – Formulaire embarqué ===
+  // === FREE – Formulaire embarqué ===
   {
     id: "embed_forms",
     name: "Formulaire embarqué",
-    description: "Créez des formulaires de commande et intégrez-les sur vos landing pages WP, HTML ou Elementor.",
+    description: "Créez jusqu'à 2 formulaires de commande et intégrez-les sur vos landing pages WP, HTML ou Elementor.",
     icon: FormInput,
-    tier: "tier2",
-    price: 5000,
+    tier: "free",
+    price: 0,
     routes: ["/dashboard/forms"],
-    features: ["form_builder", "form_embed_code", "form_order_capture", "form_analytics"],
+    features: ["form_builder", "form_embed_code", "form_order_capture"],
     category: "Outils",
     available: true,
   },
