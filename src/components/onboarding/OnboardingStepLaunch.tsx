@@ -23,7 +23,8 @@ export const OnboardingStepLaunch = ({ data }: Props) => {
     const createStore = async () => {
       setIsCreating(true);
       try {
-        // 1. Create the store and retrieve its ID
+        // 1. Create the store. A SECURITY DEFINER trigger (handle_new_store)
+        //    automatically creates the profile and admin user_role.
         const { data: newStore, error: storeError } = await supabase
           .from("stores")
           .insert({
@@ -40,41 +41,34 @@ export const OnboardingStepLaunch = ({ data }: Props) => {
 
         const storeId = newStore.id;
 
-        // 2. Create user_role (admin) — required for has_completed_onboarding
-        const { error: roleError } = await supabase.from("user_roles").insert({
-          user_id: user.id,
-          store_id: storeId,
-          role: "admin",
-        });
-        if (roleError) throw roleError;
+        // 2. Update the auto-created profile with the phone if provided
+        if (data.phone) {
+          await supabase
+            .from("profiles")
+            .update({ phone: data.phone })
+            .eq("user_id", user.id)
+            .eq("store_id", storeId);
+        }
 
-        // 3. Create profile entry
-        await supabase.from("profiles").insert({
-          user_id: user.id,
-          store_id: storeId,
-          name: user.name,
-          email: user.email,
-          phone: data.phone || null,
-        });
-
-        // 4. Activate selected paid modules
+        // 3. Activate selected paid modules
         if (data.modules.length > 0) {
-          await supabase.from("store_modules").insert(
+          const { error: modError } = await supabase.from("store_modules").insert(
             data.modules.map((moduleId) => ({
               store_id: storeId,
               module_id: moduleId,
             }))
           );
+          if (modError) console.error("Module activation error:", modError);
         }
 
-        // 5. Refresh auth profile to pick up store_id and has_completed_onboarding = true
+        // 4. Refresh auth profile to pick up store_id and has_completed_onboarding = true
         await refreshProfile();
         setStoreCreated(true);
       } catch (err: any) {
         console.error("Error creating store:", err);
         toast({
           title: "Erreur",
-          description: "Impossible de créer votre boutique. Veuillez réessayer.",
+          description: err.message || "Impossible de créer votre boutique. Veuillez réessayer.",
           variant: "destructive",
         });
       } finally {

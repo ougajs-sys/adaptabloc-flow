@@ -1,44 +1,58 @@
 import { OnboardingData } from "@/pages/Onboarding";
 import { Button } from "@/components/ui/button";
-import { ShoppingBag, Truck, Shirt, Apple, Sparkles, Wand2 } from "lucide-react";
+import { ShoppingBag, Truck, Shirt, Apple, Sparkles, Wand2, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
-const sectors = [
+interface Sector {
+  id: string;
+  label: string;
+  description: string;
+  icon: typeof ShoppingBag;
+  available: boolean;
+}
+
+const sectors: Sector[] = [
   {
     id: "ecommerce",
     label: "E-commerce & Retail",
     description: "Gestion complète : Commandes, Appelants & Livraison",
     icon: ShoppingBag,
+    available: true,
   },
   {
     id: "transport",
     label: "Transport & Logistique",
-    description: "Flotte mixte, Dispatch & Tracking en temps réel",
+    description: "Bientôt disponible",
     icon: Truck,
+    available: false,
   },
   {
     id: "mode",
     label: "Prêt-à-porter / Mode",
-    description: "Gestion tailles, couleurs & collections",
+    description: "Bientôt disponible",
     icon: Shirt,
+    available: false,
   },
   {
     id: "epicerie",
     label: "Épicerie / Frais",
-    description: "Péremptions, poids & fournisseurs",
+    description: "Bientôt disponible",
     icon: Apple,
+    available: false,
   },
   {
     id: "beaute",
     label: "Institut Beauté / Spa",
-    description: "Rendez-vous, soins & fidélité client",
+    description: "Bientôt disponible",
     icon: Sparkles,
+    available: false,
   },
   {
     id: "autre",
     label: "Autre",
-    description: "Créez votre système sur mesure avec notre IA",
+    description: "Bientôt disponible",
     icon: Wand2,
+    available: false,
   },
 ];
 
@@ -54,36 +68,58 @@ export const OnboardingStepSector = ({ data, updateData, onNext }: Props) => {
       <h2 className="text-2xl font-bold text-foreground font-[Space_Grotesk] mb-2">
         Quel est votre secteur ?
       </h2>
-      <p className="text-muted-foreground mb-8">
+      <p className="text-muted-foreground mb-2">
         Choisissez votre secteur, l'IA déploie les modules adaptés à vos processus.
+      </p>
+      <p className="text-xs text-muted-foreground mb-8">
+        🚀 <strong>MVP</strong> : nous lançons d'abord avec le e-commerce. Les autres secteurs arrivent bientôt.
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {sectors.map((s, i) => {
           const selected = data.sector === s.id;
+          const disabled = !s.available;
           return (
             <motion.button
               key={s.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: i * 0.07, ease: "easeOut" }}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => updateData({ sector: s.id })}
-              className={`flex flex-col items-start gap-3 p-4 rounded-xl border text-left transition-colors min-h-[140px] ${
-                selected
+              whileHover={!disabled ? { scale: 1.03 } : undefined}
+              whileTap={!disabled ? { scale: 0.97 } : undefined}
+              onClick={() => !disabled && updateData({ sector: s.id })}
+              disabled={disabled}
+              className={`relative flex flex-col items-start gap-3 p-4 rounded-xl border text-left transition-colors min-h-[140px] ${
+                disabled
+                  ? "border-border bg-muted/30 opacity-60 cursor-not-allowed"
+                  : selected
                   ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border bg-card hover:border-primary/30"
               }`}
             >
+              {disabled && (
+                <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground bg-background border border-border rounded-full px-2 py-0.5">
+                  <Lock size={9} /> Bientôt
+                </span>
+              )}
               <div
                 className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  selected ? "bg-primary/15" : "bg-muted"
+                  disabled
+                    ? "bg-muted"
+                    : selected
+                    ? "bg-primary/15"
+                    : "bg-muted"
                 }`}
               >
                 <s.icon
                   size={20}
-                  className={selected ? "text-primary" : "text-muted-foreground"}
+                  className={
+                    disabled
+                      ? "text-muted-foreground/60"
+                      : selected
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }
                 />
               </div>
               <div>
