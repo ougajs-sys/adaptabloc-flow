@@ -21,6 +21,7 @@ import { Search, UserPlus, Star, Users, TrendingUp, Loader2 } from "lucide-react
 import { NewCustomerDialog, type NewCustomerFormValues } from "@/components/customers/NewCustomerDialog";
 import { EditCustomerDialog, type EditCustomerFormValues } from "@/components/customers/EditCustomerDialog";
 import { CustomerDetailDialog } from "@/components/customers/CustomerDetailDialog";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -219,7 +220,37 @@ const Customers = () => {
     </AlertDialog>
     <DashboardLayout
       title="Clients"
-      actions={<Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}><UserPlus size={16} /> Ajouter un client</Button>}
+      actions={
+        <div className="flex items-center gap-2">
+          <ExportButton
+            data={customers.map((c) => ({
+              name: c.name,
+              phone: c.phone,
+              email: c.email,
+              segment: c.segment,
+              total_orders: c.totalOrders,
+              total_spent: c.totalSpent,
+              last_order: c.lastOrder ? new Date(c.lastOrder).toLocaleDateString("fr-FR") : "",
+              join_date: c.joinDate ? new Date(c.joinDate).toLocaleDateString("fr-FR") : "",
+              loyalty_points: c.loyaltyPoints,
+            }))}
+            columns={[
+              { key: "name", label: "Nom" },
+              { key: "phone", label: "Téléphone" },
+              { key: "email", label: "Email" },
+              { key: "segment", label: "Segment" },
+              { key: "total_orders", label: "Commandes" },
+              { key: "total_spent", label: "Total dépensé (FCFA)" },
+              { key: "last_order", label: "Dernière commande" },
+              { key: "join_date", label: "Inscription" },
+              { key: "loyalty_points", label: "Points fidélité" },
+            ]}
+            filename="clients"
+            printTitle="Clients Intramate"
+          />
+          <Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}><UserPlus size={16} /> Ajouter un client</Button>
+        </div>
+      }
     >
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[

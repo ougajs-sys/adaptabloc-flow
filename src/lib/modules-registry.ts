@@ -119,6 +119,17 @@ export const modulesRegistry: ModuleDefinition[] = [
     category: "Principal",
     available: true,
   },
+  {
+    id: "public_tracking",
+    name: "Suivi commande public",
+    description: "Page publique de suivi pour vos clients via un lien unique.",
+    icon: MapPin,
+    tier: "free",
+    price: 0,
+    features: ["public_track_link", "realtime_status"],
+    category: "Principal",
+    available: true,
+  },
 
   // === TIER 1 ===
   {
@@ -172,9 +183,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Tags,
     tier: "tier1",
     price: 2500,
+    routes: ["/dashboard/statuses"],
     features: ["order_custom_status"],
     category: "Personnalisation",
-    available: false,
+    available: true,
   },
   {
     id: "export",
@@ -185,7 +197,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 3000,
     features: ["export_excel", "export_pdf"],
     category: "Outils",
-    available: false,
+    available: true,
   },
   {
     id: "message_templates",
@@ -194,9 +206,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Mail,
     tier: "tier1",
     price: 2000,
+    routes: ["/dashboard/templates"],
     features: ["sms_templates", "whatsapp_templates"],
     category: "Communication",
-    available: false,
+    available: true,
   },
   {
     id: "customer_history",
@@ -213,14 +226,15 @@ export const modulesRegistry: ModuleDefinition[] = [
   // === TIER 2 ===
   {
     id: "stock_auto",
-    name: "Gestion stock automatique",
-    description: "Automatisez la gestion de votre stock avec alertes et FIFO.",
+    name: "Gestion de stock",
+    description: "Suivez votre stock en temps réel avec alertes de rupture et historique des mouvements.",
     icon: Boxes,
     tier: "tier2",
     price: 5000,
-    features: ["stock_alerts", "stock_fifo", "stock_auto_update"],
+    routes: ["/dashboard/stock"],
+    features: ["stock_alerts", "stock_movements", "stock_auto_update"],
     category: "Produits",
-    available: false,
+    available: true,
   },
   {
     id: "multi_delivery",
@@ -231,7 +245,7 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 5000,
     features: ["driver_management", "driver_assignment", "driver_stats", "unlimited_drivers"],
     category: "Équipe",
-    available: false,
+    available: true,
   },
   {
     id: "call_center",
@@ -258,13 +272,14 @@ export const modulesRegistry: ModuleDefinition[] = [
   {
     id: "segmentation",
     name: "Segmentation avancée",
-    description: "Segmentez vos clients avec des filtres avancés.",
+    description: "Segmentez vos clients avec des filtres avancés (ville, fidélité, dépense...).",
     icon: UsersRound,
     tier: "tier2",
     price: 5000,
+    routes: ["/dashboard/segments"],
     features: ["customer_segments", "customer_filters_advanced"],
     category: "Clients",
-    available: false,
+    available: true,
   },
   {
     id: "campaigns",

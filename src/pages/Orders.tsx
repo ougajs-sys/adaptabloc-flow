@@ -24,6 +24,7 @@ import { OrderPipeline, type PipelineOrder } from "@/components/orders/OrderPipe
 import { getStageByStatus, pipelineStages, type OrderPipelineStatus } from "@/lib/team-roles";
 import { NewOrderDialog, type NewOrderFormValues } from "@/components/orders/NewOrderDialog";
 import { EditOrderDialog, type EditOrderFormValues } from "@/components/orders/EditOrderDialog";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -341,6 +342,34 @@ const Orders = () => {
             <Button size="sm" variant={viewMode === "kanban" ? "default" : "ghost"} className="rounded-none h-8 px-2" onClick={() => setViewMode("kanban")}><LayoutGrid size={14} /></Button>
             <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} className="rounded-none h-8 px-2" onClick={() => setViewMode("list")}><List size={14} /></Button>
           </div>
+          <ExportButton
+            data={orders.map((o) => ({
+              order_number: o.id,
+              customer: o.customer,
+              phone: o.phone,
+              email: o.email,
+              total: o.total,
+              status: o.status,
+              payment_status: o.paymentStatus,
+              address: o.address,
+              date: new Date(o.date).toLocaleString("fr-FR"),
+              items: o.items.map((it) => `${it.qty}x ${it.name}`).join(" | "),
+            }))}
+            columns={[
+              { key: "order_number", label: "Commande" },
+              { key: "customer", label: "Client" },
+              { key: "phone", label: "Téléphone" },
+              { key: "email", label: "Email" },
+              { key: "total", label: "Total (FCFA)" },
+              { key: "status", label: "Statut" },
+              { key: "payment_status", label: "Paiement" },
+              { key: "address", label: "Adresse" },
+              { key: "items", label: "Articles" },
+              { key: "date", label: "Date" },
+            ]}
+            filename="commandes"
+            printTitle="Commandes Intramate"
+          />
           <Button size="sm" className="gap-2" onClick={() => setNewOrderOpen(true)}><Plus size={16} /> Nouvelle commande</Button>
         </div>
       }
