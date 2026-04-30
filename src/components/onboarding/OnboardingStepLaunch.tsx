@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,56 +16,39 @@ export const OnboardingStepLaunch = ({ data }: Props) => {
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
   const [storeCreated, setStoreCreated] = useState(false);
+  // Ref ensures the creation runs exactly once even if the effect re-fires
+  const creationAttemptedRef = useRef(false);
 
   useEffect(() => {
     if (!user || storeCreated || user.has_completed_onboarding) return;
+    if (creationAttemptedRef.current) return;
+    creationAttemptedRef.current = true;
 
     const createStore = async () => {
       setIsCreating(true);
       try {
-        // 1. Create the store. A SECURITY DEFINER trigger (handle_new_store)
-        //    automatically creates the profile and admin user_role.
-        const { data: newStore, error: storeError } = await supabase
-          .from("stores")
-          .insert({
-            name: data.businessName || "Ma Boutique",
-            owner_id: user.id,
-            sector: data.sector || null,
-            email: data.email || null,
-            phone: data.phone || null,
-          })
-          .select("id")
-          .single();
+        // Call a SECURITY DEFINER RPC that bypasses RLS and is idempotent.
+        // It creates the store, triggers handle_new_store (profile + admin role),
+        // updates the phone, and activates modules — all in one transaction.
+        const { data: storeId, error } = await supabase.rpc(
+          "create_store_for_user" as never,
+          {
+            p_name: data.businessName || "Ma Boutique",
+            p_sector: data.sector || null,
+            p_email: data.email || null,
+            p_phone: data.phone || null,
+            p_modules: data.modules.length > 0 ? data.modules : [],
+          } as never
+        );
 
-        if (storeError) throw storeError;
+        if (error) throw error;
+        if (!storeId) throw new Error("Aucun identifiant de boutique retourné.");
 
-        const storeId = newStore.id;
-
-        // 2. Update the auto-created profile with the phone if provided
-        if (data.phone) {
-          await supabase
-            .from("profiles")
-            .update({ phone: data.phone })
-            .eq("user_id", user.id)
-            .eq("store_id", storeId);
-        }
-
-        // 3. Activate selected paid modules
-        if (data.modules.length > 0) {
-          const { error: modError } = await supabase.from("store_modules").insert(
-            data.modules.map((moduleId) => ({
-              store_id: storeId,
-              module_id: moduleId,
-            }))
-          );
-          if (modError) console.error("Module activation error:", modError);
-        }
-
-        // 4. Refresh auth profile to pick up store_id and has_completed_onboarding = true
         await refreshProfile();
         setStoreCreated(true);
       } catch (err: any) {
         console.error("Error creating store:", err);
+        creationAttemptedRef.current = false; // allow retry on error
         toast({
           title: "Erreur",
           description: err.message || "Impossible de créer votre boutique. Veuillez réessayer.",
@@ -119,7 +102,7 @@ export const OnboardingStepLaunch = ({ data }: Props) => {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Modules activés</span>
-            <span className="font-medium text-foreground">{data.modules.length + 5} modules</span>
+            <span className="font-medium text-foreground">{data.modules.length + 6} modules</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Email</span>
