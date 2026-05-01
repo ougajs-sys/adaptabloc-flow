@@ -43,12 +43,16 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   cancelled: { label: "Annulée", variant: "destructive" },
 };
 
-const CampaignsContent = () => {
+interface CampaignsContentProps {
+  newOpen: boolean;
+  setNewOpen: (v: boolean) => void;
+}
+
+const CampaignsContent = ({ newOpen, setNewOpen }: CampaignsContentProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const storeId = user?.store_id;
 
-  const [newOpen, setNewOpen] = useState(false);
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<"sms" | "whatsapp" | "email">("whatsapp");
   const [message, setMessage] = useState("");
@@ -266,19 +270,21 @@ const CampaignsContent = () => {
 };
 
 const Campaigns = () => {
+  const [newOpen, setNewOpen] = useState(false);
+
   return (
     <DashboardLayout
       title="Campagnes"
       actions={
         <ModuleGate moduleId="campaigns" fallback={null}>
-          <Button size="sm" className="gap-2" onClick={() => document.dispatchEvent(new CustomEvent("open-new-campaign"))}>
+          <Button size="sm" className="gap-2" onClick={() => setNewOpen(true)}>
             <Plus size={16} /> Nouvelle campagne
           </Button>
         </ModuleGate>
       }
     >
       <ModuleGate moduleId="campaigns">
-        <CampaignsContent />
+        <CampaignsContent newOpen={newOpen} setNewOpen={setNewOpen} />
       </ModuleGate>
     </DashboardLayout>
   );
