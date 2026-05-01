@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,17 +9,53 @@ import { getModuleById, FREE_MODULE_IDS, modulesRegistry, tierLabels } from "@/l
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Check, Package, ArrowRight, Receipt, CreditCard, Layers, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PaymentCheckout } from "@/components/billing/PaymentCheckout";
+import { useToast } from "@/hooks/use-toast";
 
 const Billing = () => {
   const { activeModules, monthlyPrice, getModulePrice } = useModules();
   const navigate = useNavigate();
   const { user } = useAuth();
   const storeId = user?.store_id;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Handle Moneroo return URL: ?paymentId=xxx&paymentStatus=success|failed|cancelled
+  useEffect(() => {
+    const paymentId = searchParams.get("paymentId");
+    const paymentStatus = searchParams.get("paymentStatus");
+
+    if (!paymentId || !paymentStatus) return;
+
+    // Remove params from URL immediately to avoid re-triggering on refresh
+    setSearchParams({}, { replace: true });
+
+    if (paymentStatus === "success") {
+      toast({
+        title: "Paiement reçu !",
+        description: "Vos modules sont en cours d'activation. La page se met à jour automatiquement.",
+      });
+      // Invalidate queries so data refreshes once webhook activates modules
+      queryClient.invalidateQueries({ queryKey: ["invoices", storeId] });
+    } else if (paymentStatus === "failed") {
+      toast({
+        title: "Paiement échoué",
+        description: "Le paiement n'a pas pu être traité. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } else if (paymentStatus === "cancelled") {
+      toast({
+        title: "Paiement annulé",
+        description: "Le paiement a été annulé.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, setSearchParams, toast, queryClient, storeId]);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices", storeId],

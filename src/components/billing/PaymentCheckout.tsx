@@ -22,6 +22,7 @@ interface PaymentProvider {
 }
 
 const providerIcons: Record<string, typeof CreditCard> = {
+  moneroo: Smartphone,
   cinetpay: CreditCard,
   paydunya: Smartphone,
   wave: Wallet,
@@ -33,6 +34,7 @@ const methodLabels: Record<string, string> = {
   "mastercard": "Mastercard",
   "orange_money": "Orange Money",
   "mtn_money": "MTN Money",
+  "moov_money": "Moov Money",
   "wave": "Wave",
   "mobile_money": "Mobile Money",
   "card": "Carte bancaire",
