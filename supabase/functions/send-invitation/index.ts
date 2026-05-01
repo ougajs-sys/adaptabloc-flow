@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     // Use service role client to invite user
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const origin = req.headers.get("origin") || "https://adaptabloc-flow.lovable.app";
+    const origin = req.headers.get("origin") || "https://cheerful-longma-30a8e7.netlify.app";
 
     const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
       redirectTo: `${origin}/login`,
