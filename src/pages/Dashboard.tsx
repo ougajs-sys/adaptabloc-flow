@@ -41,7 +41,7 @@ const Dashboard = () => {
       supabase.from("orders").select("id, order_number, total_amount, status, created_at, customer_id, customers(name)").eq("store_id", storeId).order("created_at", { ascending: false }),
       supabase.from("customers").select("id", { count: "exact", head: true }).eq("store_id", storeId),
       supabase.from("deliveries").select("id", { count: "exact", head: true }).eq("store_id", storeId),
-      supabase.from("order_items").select("product_name, quantity, unit_price, total_price, order_id, orders!inner(store_id)").eq("orders.store_id", storeId),
+      supabase.from("order_items").select("product_name, quantity, unit_price, total_price, order_id, orders!inner(store_id, status)").filter("orders.store_id", "eq", storeId),
     ]);
 
     const orders = ordersRes.data || [];
