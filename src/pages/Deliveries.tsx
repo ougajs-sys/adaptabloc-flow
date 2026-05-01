@@ -90,10 +90,11 @@ const Deliveries = () => {
     driverRoles.some((r) => r.user_id === p.user_id)
   );
 
-  // Fetch orders ready for delivery (status = ready, confirmed, preparing) that don't have a delivery yet
-  const existingDeliveryOrderIds = deliveries.map((d: any) => d.order_id);
-  const { data: eligibleOrders = [] } = useQuery({
-    queryKey: ["eligible-orders-for-delivery", storeId, existingDeliveryOrderIds],
+  // Fetch orders ready for delivery (status = ready, confirmed, preparing).
+  // Filtering of orders that already have a delivery is done client-side
+  // to keep the queryKey stable (avoids infinite refetches).
+  const { data: eligibleOrdersRaw = [] } = useQuery({
+    queryKey: ["eligible-orders-for-delivery", storeId],
     enabled: !!storeId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -103,10 +104,12 @@ const Deliveries = () => {
         .in("status", ["ready", "confirmed", "preparing"])
         .order("created_at", { ascending: false });
       if (error) throw error;
-      // Filter out orders that already have a delivery
-      return (data || []).filter((o: any) => !existingDeliveryOrderIds.includes(o.id));
+      return data || [];
     },
   });
+
+  const existingDeliveryOrderIds = deliveries.map((d: any) => d.order_id);
+  const eligibleOrders = eligibleOrdersRaw.filter((o: any) => !existingDeliveryOrderIds.includes(o.id));
 
   // Create delivery mutation
   const createMutation = useMutation({

@@ -272,16 +272,28 @@ const Orders = () => {
   const handleAdvance = useCallback(async (orderId: string, nextStatus: OrderPipelineStatus) => {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
+    const previousStatus = order.status;
     const dbStatus = mapToDbStatus(nextStatus);
-    await supabase.from("orders").update({ status: dbStatus as any }).eq("id", order.dbId);
+    // Optimistic update
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)));
+    const { error } = await supabase.from("orders").update({ status: dbStatus as any }).eq("id", order.dbId);
+    if (error) {
+      // Revert optimistic update
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: previousStatus } : o)));
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    }
   }, [orders]);
 
   const handleCancel = useCallback(async (orderId: string) => {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
-    await supabase.from("orders").update({ status: "cancelled" as any }).eq("id", order.dbId);
+    const previousStatus = order.status;
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o)));
+    const { error } = await supabase.from("orders").update({ status: "cancelled" as any }).eq("id", order.dbId);
+    if (error) {
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: previousStatus } : o)));
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    }
   }, [orders]);
 
   const pipelineOrders: PipelineOrder[] = (viewMode === "kanban" ? filtered : paginatedOrders).map((o) => ({

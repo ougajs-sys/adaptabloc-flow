@@ -30,11 +30,17 @@ Deno.serve(async (req) => {
 
     if (expiredSubs && expiredSubs.length > 0) {
       for (const sub of expiredSubs) {
-        // Deactivate modules
-        await supabaseAdmin
-          .from("store_modules")
-          .delete()
-          .eq("store_id", sub.store_id);
+        // Deactivate ONLY the modules tied to this subscription.
+        // The subscription's `modules` array is preserved as a record
+        // for re-activation if the user renews.
+        const subModules = (sub.modules as string[]) || [];
+        if (subModules.length > 0) {
+          await supabaseAdmin
+            .from("store_modules")
+            .delete()
+            .eq("store_id", sub.store_id)
+            .in("module_id", subModules);
+        }
 
         // Mark subscription as expired
         await supabaseAdmin

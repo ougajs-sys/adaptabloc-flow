@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
       const unitPrice = product ? product.price : 0;
       const totalPrice = unitPrice * quantity;
 
-      await supabaseClient
+      const { error: itemError } = await supabaseClient
         .from('order_items')
         .insert({
           order_id: order.id,
@@ -156,11 +156,21 @@ Deno.serve(async (req) => {
           total_price: totalPrice
         })
 
+      if (itemError) {
+        console.error('Order item creation failed:', itemError)
+        throw new Error('Failed to create order item')
+      }
+
       // Update total amount on order
-      await supabaseClient
+      const { error: totalError } = await supabaseClient
         .from('orders')
         .update({ total_amount: totalPrice })
         .eq('id', order.id)
+
+      if (totalError) {
+        console.error('Total amount update failed:', totalError)
+        throw new Error('Failed to update order total')
+      }
     }
 
     // 5. Update stats
