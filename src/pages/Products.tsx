@@ -137,13 +137,18 @@ const Products = () => {
 
     // Insert variants
     if (values.variants.length > 0) {
-      await supabase.from("product_variants").insert(
+      const { error: variantError } = await supabase.from("product_variants").insert(
         values.variants.map((v) => ({
           product_id: newProd.id,
           name: v.label ?? "",
           stock: v.stock ?? 0,
         }))
       );
+      if (variantError) {
+        toast({ title: "Produit créé, erreur variantes", description: variantError.message, variant: "destructive" });
+        fetchProducts();
+        return;
+      }
     }
 
     toast({ title: "Produit ajouté" });
@@ -170,13 +175,18 @@ const Products = () => {
     // Replace variants: delete old, insert new
     await supabase.from("product_variants").delete().eq("product_id", editingProduct.id);
     if (values.variants.length > 0) {
-      await supabase.from("product_variants").insert(
+      const { error: variantError } = await supabase.from("product_variants").insert(
         values.variants.map((v) => ({
           product_id: editingProduct.id,
           name: v.label,
           stock: v.stock,
         }))
       );
+      if (variantError) {
+        toast({ title: "Produit modifié, erreur variantes", description: variantError.message, variant: "destructive" });
+        fetchProducts();
+        return;
+      }
     }
 
     toast({ title: "Produit modifié" });

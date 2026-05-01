@@ -107,7 +107,7 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase
         .from("store_modules")
         .insert({ store_id: storeId, module_id: id });
-      if (error && !error.message.includes("duplicate")) {
+      if (error && error.code !== "23505") {
         setPaidModules((prev) => prev.filter((m) => m !== id));
       }
     },
