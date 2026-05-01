@@ -50,24 +50,29 @@ export function getCurrencySymbol(currency: SupportedCurrency): string {
 export function getProvidersForCountry(countryCode: string): string[] {
   const upper = countryCode.toUpperCase();
   const providers: string[] = [];
-  
+
+  // Moneroo (Chariow): 15+ African countries — preferred provider
+  if (["BJ","CI","SN","CM","BF","TG","ML","NE","GN","GW","GH","NG","RW","UG","TZ","KE","CD"].includes(upper)) {
+    providers.push("moneroo");
+  }
+
   // CinetPay: Francophone Africa
-  if (["CI", "SN", "ML", "BF", "NE", "TG", "BJ", "CM", "GA", "CG", "TD", "CF", "GQ", "GW", "GN", "CD", "RW"].includes(upper)) {
+  if (["CI","SN","ML","BF","NE","TG","BJ","CM","GA","CG","TD","CF","GQ","GW","GN","CD","RW"].includes(upper)) {
     providers.push("cinetpay");
   }
-  
+
   // PayDunya: West Africa
-  if (["CI", "SN", "ML", "BF", "NE", "TG", "BJ", "GW", "GN"].includes(upper)) {
+  if (["CI","SN","ML","BF","NE","TG","BJ","GW","GN"].includes(upper)) {
     providers.push("paydunya");
   }
-  
+
   // Wave: CI and SN
-  if (["CI", "SN"].includes(upper)) {
+  if (["CI","SN"].includes(upper)) {
     providers.push("wave");
   }
-  
+
   // Paystack: Africa + international (always available as fallback)
   providers.push("paystack");
-  
+
   return providers;
 }

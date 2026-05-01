@@ -37,6 +37,103 @@ async function getModulePrices(supabaseAdmin: any): Promise<Record<string, numbe
   return prices;
 }
 
+function getFrontendUrl(): string {
+  return Deno.env.get("FRONTEND_URL") || "https://cheerful-longma-30a8e7.netlify.app";
+}
+
+// ─── Moneroo ────────────────────────────────────────────────────────────────
+
+async function initiateMoneroo(
+  supabaseAdmin: any,
+  store_id: string,
+  modules: string[],
+  totalXOF: number,
+  totalConverted: number,
+  feeAmount: number,
+  netAmount: number,
+  currency: string,
+  country: string | null,
+  userEmail: string,
+  userName: string,
+) {
+  const { data: txn, error: txnErr } = await supabaseAdmin
+    .from("transactions")
+    .insert({
+      store_id,
+      gross_amount: Math.round(totalConverted),
+      net_amount: Math.round(netAmount),
+      fee_amount: Math.round(feeAmount),
+      currency: currency || "XOF",
+      provider: "moneroo",
+      country: country || null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+
+  if (txnErr) throw txnErr;
+
+  const MONEROO_SECRET_KEY = Deno.env.get("MONEROO_SECRET_KEY");
+  if (!MONEROO_SECRET_KEY) throw new Error("MONEROO_SECRET_KEY not configured");
+
+  const frontendUrl = getFrontendUrl();
+  const moduleNames = modules.map((id) => id.replace(/_/g, " ")).join(", ");
+
+  const nameParts = userName.trim().split(" ");
+  const firstName = nameParts[0] || "Client";
+  const lastName = nameParts.slice(1).join(" ") || firstName;
+
+  const payload: Record<string, unknown> = {
+    amount: Math.round(totalXOF), // Moneroo works in XOF for African market
+    currency: "XOF",
+    description: `Abonnement Intramate – ${modules.length} module(s): ${moduleNames}`,
+    customer: {
+      email: userEmail,
+      first_name: firstName,
+      last_name: lastName,
+    },
+    return_url: `${frontendUrl}/dashboard/billing`,
+    metadata: {
+      store_id,
+      transaction_id: txn.id,
+      modules: JSON.stringify(modules),
+      currency,
+      country: country || "",
+    },
+  };
+
+  const res = await fetch("https://api.moneroo.io/v1/payments/initialize", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Authorization": `Bearer ${MONEROO_SECRET_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data?.data?.checkout_url) {
+    await supabaseAdmin.from("transactions").update({ status: "failed" }).eq("id", txn.id);
+    throw new Error(data?.message || `Moneroo error ${res.status}`);
+  }
+
+  // Store Moneroo payment ID as provider_reference for webhook lookup
+  await supabaseAdmin
+    .from("transactions")
+    .update({ provider_reference: data.data.id })
+    .eq("id", txn.id);
+
+  return {
+    payment_url: data.data.checkout_url,
+    transaction_id: txn.id,
+    moneroo_id: data.data.id,
+  };
+}
+
+// ─── PayDunya ───────────────────────────────────────────────────────────────
+
 async function initiatePayDunya(
   supabaseAdmin: any,
   store_id: string,
@@ -47,43 +144,38 @@ async function initiatePayDunya(
   netAmount: number,
   currency: string,
   country: string | null,
-  provider: string,
-  providerData: any,
 ) {
-  const now = new Date();
-
-  // Create pending transaction first
-  const { data: txn, error: txnErr } = await supabaseAdmin.from("transactions").insert({
-    store_id,
-    gross_amount: Math.round(totalConverted),
-    net_amount: Math.round(netAmount),
-    fee_amount: Math.round(feeAmount),
-    currency: currency || "XOF",
-    provider,
-    country: country || null,
-    status: "pending",
-  }).select("id").single();
+  const { data: txn, error: txnErr } = await supabaseAdmin
+    .from("transactions")
+    .insert({
+      store_id,
+      gross_amount: Math.round(totalConverted),
+      net_amount: Math.round(netAmount),
+      fee_amount: Math.round(feeAmount),
+      currency: currency || "XOF",
+      provider: "paydunya",
+      country: country || null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
 
   if (txnErr) throw txnErr;
 
-  // Build PayDunya checkout invoice
   const PAYDUNYA_MASTER_KEY = Deno.env.get("PAYDUNYA_MASTER_KEY")!;
   const PAYDUNYA_PRIVATE_KEY = Deno.env.get("PAYDUNYA_PRIVATE_KEY")!;
   const PAYDUNYA_TOKEN = Deno.env.get("PAYDUNYA_TOKEN")!;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const callbackUrl = `${supabaseUrl}/functions/v1/payment-webhook`;
-
-  const moduleNames = modules.map(id => id.replace(/_/g, " ")).join(", ");
+  const frontendUrl = getFrontendUrl();
+  const moduleNames = modules.map((id) => id.replace(/_/g, " ")).join(", ");
 
   const invoicePayload = {
     invoice: {
-      total_amount: Math.round(totalXOF), // PayDunya uses XOF
+      total_amount: Math.round(totalXOF),
       description: `Abonnement Intramate – ${modules.length} module(s): ${moduleNames}`,
     },
-    store: {
-      name: "Intramate",
-    },
+    store: { name: "Intramate" },
     custom_data: {
       store_id,
       transaction_id: txn.id,
@@ -92,16 +184,13 @@ async function initiatePayDunya(
       country: country || "",
     },
     actions: {
-      callback_url: callbackUrl,
-      return_url: `${supabaseUrl.replace('.supabase.co', '')}.lovable.app/dashboard/billing`,
-      cancel_url: `${supabaseUrl.replace('.supabase.co', '')}.lovable.app/dashboard/billing`,
+      callback_url: `${supabaseUrl}/functions/v1/payment-webhook`,
+      return_url: `${frontendUrl}/dashboard/billing`,
+      cancel_url: `${frontendUrl}/dashboard/billing`,
     },
   };
 
-  // Production API
-  const apiBase = "https://app.paydunya.com/api/v1";
-
-  const paydunyaRes = await fetch(`${apiBase}/checkout-invoice/create`, {
+  const paydunyaRes = await fetch("https://app.paydunya.com/api/v1/checkout-invoice/create", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -115,22 +204,23 @@ async function initiatePayDunya(
   const paydunyaData = await paydunyaRes.json();
 
   if (paydunyaData.response_code !== "00") {
-    // Update transaction to failed
     await supabaseAdmin.from("transactions").update({ status: "failed" }).eq("id", txn.id);
     throw new Error(paydunyaData.response_text || "PayDunya invoice creation failed");
   }
 
-  // Store PayDunya token as provider_reference
-  await supabaseAdmin.from("transactions")
+  await supabaseAdmin
+    .from("transactions")
     .update({ provider_reference: paydunyaData.token })
     .eq("id", txn.id);
 
   return {
-    payment_url: paydunyaData.response_text, // PayDunya returns checkout URL here
+    payment_url: paydunyaData.response_text,
     transaction_id: txn.id,
     token: paydunyaData.token,
   };
 }
+
+// ─── Subscription helpers ────────────────────────────────────────────────────
 
 async function activateSubscription(
   supabaseAdmin: any,
@@ -145,16 +235,13 @@ async function activateSubscription(
   const renewalDate = new Date(now);
   renewalDate.setMonth(renewalDate.getMonth() + 1);
 
-  // Create/update subscription
   const { data: subscription, error: subError } = await supabaseAdmin
     .from("subscriptions")
     .upsert({
-      store_id,
-      modules,
+      store_id, modules,
       amount: Math.round(totalConverted),
       currency: currency || "XOF",
-      provider,
-      country: country || null,
+      provider, country: country || null,
       status: "active",
       started_at: now.toISOString(),
       renewal_date: renewalDate.toISOString(),
@@ -174,7 +261,8 @@ async function activateSubscription(
         started_at: now.toISOString(),
         renewal_date: renewalDate.toISOString(),
       })
-      .select().single();
+      .select()
+      .single();
     if (insertErr) throw insertErr;
     return newSub;
   }
@@ -190,7 +278,13 @@ async function activateModules(supabaseAdmin: any, store_id: string, modules: st
   }
 }
 
-async function createInvoice(supabaseAdmin: any, store_id: string, modules: string[], totalConverted: number, status = "paid") {
+async function createInvoice(
+  supabaseAdmin: any,
+  store_id: string,
+  modules: string[],
+  totalConverted: number,
+  status = "paid",
+) {
   const now = new Date();
   const renewalDate = new Date(now);
   renewalDate.setMonth(renewalDate.getMonth() + 1);
@@ -208,6 +302,8 @@ async function createInvoice(supabaseAdmin: any, store_id: string, modules: stri
   });
 }
 
+// ─── Main handler ────────────────────────────────────────────────────────────
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -222,27 +318,38 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
     const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    // Verify user identity (fixed: was using non-existent getClaims API)
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
+    const userEmail = user.email || "";
+    const userName = (user.user_metadata?.full_name as string) ||
+      (user.user_metadata?.name as string) ||
+      userEmail.split("@")[0] ||
+      "Client";
 
     const { store_id, provider, modules, currency, country } = await req.json();
 
     // Validate store membership
     const { data: role } = await supabaseAdmin
-      .from("user_roles").select("id").eq("user_id", userId).eq("store_id", store_id).limit(1);
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("store_id", store_id)
+      .limit(1);
 
     if (!role || role.length === 0) {
       return new Response(JSON.stringify({ error: "Not a member of this store" }), {
@@ -252,7 +359,11 @@ Deno.serve(async (req) => {
 
     // Get provider config
     const { data: providerData } = await supabaseAdmin
-      .from("payment_providers").select("*").eq("name", provider).eq("is_active", true).single();
+      .from("payment_providers")
+      .select("*")
+      .eq("name", provider)
+      .eq("is_active", true)
+      .single();
 
     if (!providerData) {
       return new Response(JSON.stringify({ error: "Provider not available" }), {
@@ -260,27 +371,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch dynamic prices from DB
-    const modulesPrices = await getModulePrices(supabaseAdmin);
-
     // Calculate amounts
-    const totalXOF = (modules as string[]).reduce((sum: number, id: string) => sum + (modulesPrices[id] || 0), 0);
+    const modulesPrices = await getModulePrices(supabaseAdmin);
+    const totalXOF = (modules as string[]).reduce(
+      (sum: number, id: string) => sum + (modulesPrices[id] || 0), 0
+    );
     const totalConverted = convertFromXOF(totalXOF, currency || "XOF");
     const feeAmount = Math.round(totalConverted * (providerData.fee_percentage / 100) * 100) / 100;
     const netAmount = Math.round((totalConverted - feeAmount) * 100) / 100;
 
-    // === PayDunya provider: redirect to checkout ===
-    if (provider === "paydunya") {
-      const result = await initiatePayDunya(
-        supabaseAdmin, store_id, modules, totalXOF, totalConverted,
-        feeAmount, netAmount, currency || "XOF", country || null, provider, providerData,
+    // ── Moneroo ──
+    if (provider === "moneroo") {
+      const result = await initiateMoneroo(
+        supabaseAdmin, store_id, modules,
+        totalXOF, totalConverted, feeAmount, netAmount,
+        currency || "XOF", country || null,
+        userEmail, userName,
       );
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // === Fallback: direct activation (for testing / other providers) ===
+    // ── PayDunya ──
+    if (provider === "paydunya") {
+      const result = await initiatePayDunya(
+        supabaseAdmin, store_id, modules,
+        totalXOF, totalConverted, feeAmount, netAmount,
+        currency || "XOF", country || null,
+      );
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Fallback: direct activation (testing / manual providers) ──
     const subscription = await activateSubscription(
       supabaseAdmin, store_id, modules, totalConverted, currency, provider, country,
     );
@@ -291,8 +416,7 @@ Deno.serve(async (req) => {
       net_amount: Math.round(netAmount),
       fee_amount: Math.round(feeAmount),
       currency: currency || "XOF",
-      provider,
-      country: country || null,
+      provider, country: country || null,
       status: "completed",
       subscription_id: subscription?.id || null,
     });
@@ -311,12 +435,12 @@ Deno.serve(async (req) => {
         currency,
         renewal_date: renewalDate.toISOString(),
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
     return new Response(
       JSON.stringify({ error: err.message || "Internal error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
