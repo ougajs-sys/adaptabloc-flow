@@ -12,7 +12,16 @@ import {
   CheckCircle2,
   Phone,
   Package,
+  Star,
 } from "lucide-react";
+
+const avatarPhotos = [
+  "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=40&h=40&fit=crop&crop=faces&auto=format&q=80",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=faces&auto=format&q=80",
+  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=40&h=40&fit=crop&crop=faces&auto=format&q=80",
+  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=40&h=40&fit=crop&crop=faces&auto=format&q=80",
+  "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=40&h=40&fit=crop&crop=faces&auto=format&q=80",
+];
 
 const chartData = [42, 68, 51, 89, 73, 95, 110, 128];
 
@@ -123,6 +132,39 @@ export const HeroSection = () => {
               <span className="text-foreground font-medium"> un seul outil modulaire</span>{" "}
               conçu pour les marchands africains.
             </p>
+
+            {/* Avatar stack social proof */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex items-center gap-3 justify-center lg:justify-start mb-7"
+            >
+              <div className="flex -space-x-2.5">
+                {avatarPhotos.map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt="Marchand Intramate"
+                    className="w-9 h-9 rounded-full border-2 border-background object-cover shadow-md"
+                  />
+                ))}
+              </div>
+              <div>
+                <div className="flex gap-0.5 mb-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      size={11}
+                      className="text-[hsl(38,95%,55%)] fill-[hsl(38,95%,55%)]"
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  <span className="font-semibold text-foreground">340+</span> marchands actifs en Afrique
+                </p>
+              </div>
+            </motion.div>
 
             {/* Primary CTAs */}
             <div className="flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start mb-8">
