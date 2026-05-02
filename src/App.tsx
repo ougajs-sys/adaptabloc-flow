@@ -26,6 +26,8 @@ import Help from "./pages/Help";
 import Campaigns from "./pages/Campaigns";
 import EmbedForms from "./pages/EmbedForms";
 import EmbedOrder from "./pages/EmbedOrder";
+import LandingPages from "./pages/LandingPages";
+import PublicLandingPage from "./pages/PublicLandingPage";
 import Templates from "./pages/Templates";
 import CustomStatuses from "./pages/CustomStatuses";
 import Segments from "./pages/Segments";
@@ -55,7 +57,16 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (isLoading) return null;
+  // Wait for both session AND user profile to be loaded — prevents
+  // a redirect-to-/onboarding race when session is set but buildAppUser
+  // hasn't populated user.has_completed_onboarding yet.
+  if (isLoading || (isAuthenticated && !user)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user?.has_completed_onboarding) return <Navigate to="/onboarding" replace />;
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
@@ -121,6 +132,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
     <Route path="/dashboard/campaigns" element={<ProtectedRoute allowedRoles={["admin"]}><Campaigns /></ProtectedRoute>} />
     <Route path="/dashboard/forms" element={<ProtectedRoute allowedRoles={["admin"]}><EmbedForms /></ProtectedRoute>} />
+    <Route path="/dashboard/landing-pages" element={<ProtectedRoute allowedRoles={["admin"]}><LandingPages /></ProtectedRoute>} />
     <Route path="/dashboard/templates" element={<ProtectedRoute allowedRoles={["admin"]}><Templates /></ProtectedRoute>} />
     <Route path="/dashboard/statuses" element={<ProtectedRoute allowedRoles={["admin"]}><CustomStatuses /></ProtectedRoute>} />
     <Route path="/dashboard/segments" element={<ProtectedRoute allowedRoles={["admin"]}><Segments /></ProtectedRoute>} />
@@ -130,6 +142,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/workspace/preparateur" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><PreparateurWorkspace /></ProtectedRoute>} />
     <Route path="/dashboard/workspace/livreur" element={<ProtectedRoute allowedRoles={["admin", "driver"]}><LivreurWorkspace /></ProtectedRoute>} />
     <Route path="/embed/order" element={<EmbedOrder />} />
+    <Route path="/p/:slug" element={<PublicLandingPage />} />
     <Route path="/setup-admin" element={<SetupAdmin />} />
 
     {/* Admin HQ - aliases */}

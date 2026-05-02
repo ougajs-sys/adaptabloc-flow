@@ -25,6 +25,7 @@ import {
   PackageCheck,
   Headphones,
   Warehouse,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -372,6 +373,18 @@ export const modulesRegistry: ModuleDefinition[] = [
     price: 0,
     routes: ["/dashboard/forms"],
     features: ["form_builder", "form_embed_code", "form_order_capture"],
+    category: "Outils",
+    available: true,
+  },
+  {
+    id: "landing_pages",
+    name: "Landing Pages",
+    description: "Créez des pages publiques pour vos produits avec formulaire de commande intégré. Mode template ou HTML libre. 1 page gratuite, illimité en Pro.",
+    icon: Layers,
+    tier: "free",
+    price: 0,
+    routes: ["/dashboard/landing-pages"],
+    features: ["landing_template", "landing_html", "landing_form_embed", "landing_analytics"],
     category: "Outils",
     available: true,
   },
