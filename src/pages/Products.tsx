@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { normalize } from "@/lib/normalize";
 import { usePagination } from "@/hooks/usePagination";
 import { DataPagination } from "@/components/ui/data-pagination";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -209,7 +210,8 @@ const Products = () => {
 
   const categories = [...new Set(products.map((p) => p.category))];
   const filtered = products.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
+    const q = normalize(search);
+    const matchSearch = normalize(p.name).includes(q) || normalize(p.id).includes(q);
     const matchCategory = categoryFilter === "all" || p.category === categoryFilter;
     return matchSearch && matchCategory;
   });

@@ -10,6 +10,7 @@ export interface AppUser {
   name: string;
   avatar_url: string;
   has_completed_onboarding: boolean;
+  email_confirmed: boolean;
   store_id: string | null;
   role: string | null;
 }
@@ -63,6 +64,7 @@ async function buildAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
     name,
     avatar_url: avatarUrl,
     has_completed_onboarding: !!storeId,
+    email_confirmed: !!supabaseUser.email_confirmed_at,
     store_id: storeId,
     role,
   };

@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
+import VerifyEmail from "./pages/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import Products from "./pages/Products";
@@ -68,6 +69,8 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allow
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // Block access until email is confirmed (only when Supabase email confirmation is enabled)
+  if (user && !user.email_confirmed) return <Navigate to="/verify-email" replace />;
   if (!user?.has_completed_onboarding) return <Navigate to="/onboarding" replace />;
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
@@ -118,6 +121,7 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<Landing />} />
     <Route path="/login" element={<Login />} />
+    <Route path="/verify-email" element={<VerifyEmail />} />
     <Route path="/onboarding" element={<Onboarding />} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/dashboard/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

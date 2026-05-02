@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { normalize } from "@/lib/normalize";
 import { usePagination } from "@/hooks/usePagination";
 import { DataPagination } from "@/components/ui/data-pagination";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -166,7 +167,8 @@ const Customers = () => {
   };
 
   const filtered = customers.filter((c) => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
+    const q = normalize(search);
+    const matchSearch = normalize(c.name).includes(q) || c.phone.includes(search);
     const matchSegment = segmentFilter === "all" || c.segment === segmentFilter;
     return matchSearch && matchSegment;
   });
