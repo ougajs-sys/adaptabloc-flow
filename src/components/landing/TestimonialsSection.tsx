@@ -6,7 +6,8 @@ const testimonials = [
     name: "Aïcha Traoré",
     role: "Fondatrice, Maïmouna Boutique",
     location: "Abidjan, Côte d'Ivoire",
-    photo: "https://i.pravatar.cc/88?img=44",
+    photo:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=88&h=88&fit=crop&crop=faces&auto=format&q=80",
     quote:
       "Avant Intramate, je perdais 3 commandes par jour à cause des appels manqués. Maintenant mes callers gèrent tout sur leur téléphone, et je vois le pipeline en temps réel.",
     metric: { value: "+40%", label: "Taux de confirmation" },
@@ -16,7 +17,8 @@ const testimonials = [
     name: "Mamadou Diallo",
     role: "CEO, FastDelivery 225",
     location: "Yopougon, Côte d'Ivoire",
-    photo: "https://i.pravatar.cc/88?img=33",
+    photo:
+      "https://images.unsplash.com/photo-1542838132-92c53300491e?w=88&h=88&fit=crop&crop=faces&auto=format&q=80",
     quote:
       "On gère 12 livreurs sur 4 quartiers. Le module géolocalisation nous a permis de passer de 65% à 92% de livraisons réussies. Le ROI a été immédiat.",
     metric: { value: "92%", label: "Livraisons réussies" },
@@ -26,7 +28,8 @@ const testimonials = [
     name: "Fatou Diop",
     role: "Directrice, Xessal Cosmétiques",
     location: "Dakar, Sénégal",
-    photo: "https://i.pravatar.cc/88?img=56",
+    photo:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=88&h=88&fit=crop&crop=faces&auto=format&q=80",
     quote:
       "L'iframe sur ma landing page me ramène 30 commandes par jour. Et avec les campagnes WhatsApp, mes clientes reviennent toutes les semaines.",
     metric: { value: "30/jour", label: "Commandes via iframe" },
@@ -79,48 +82,57 @@ export const TestimonialsSection = () => {
               {/* Card glow on hover */}
               <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity -z-10" />
 
-              <div className="relative h-full p-6 rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl hover:border-primary/30 transition-all flex flex-col">
-                {/* Quote icon */}
-                <Quote
-                  size={32}
-                  className="text-primary/20 mb-3"
-                  strokeWidth={1.5}
-                />
-
-                {/* Stars */}
-                <div className="flex gap-0.5 mb-4">
-                  {Array.from({ length: t.rating }).map((_, k) => (
-                    <Star
-                      key={k}
-                      size={14}
-                      className="text-[hsl(38,95%,55%)] fill-[hsl(38,95%,55%)]"
-                    />
-                  ))}
-                </div>
-
-                {/* Quote text */}
-                <p className="text-sm text-foreground/90 leading-relaxed mb-5 flex-1">
-                  "{t.quote}"
-                </p>
-
-                {/* Metric highlight */}
-                <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 mb-5">
-                  <p className="text-xl font-bold text-accent font-[Space_Grotesk] leading-none">
-                    {t.metric.value}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
-                    {t.metric.label}
-                  </p>
-                </div>
-
-                {/* Author */}
-                <div className="flex items-center gap-3 pt-4 border-t border-border/40">
+              <div className="relative h-full rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl hover:border-primary/30 transition-all flex flex-col overflow-hidden">
+                {/* Photo banner top */}
+                <div className="relative h-28 overflow-hidden shrink-0">
                   <img
                     src={t.photo}
                     alt={t.name}
-                    className="w-11 h-11 rounded-full object-cover shadow-md ring-2 ring-border"
+                    className="absolute inset-0 w-full h-full object-cover object-top scale-125 blur-sm opacity-60"
                   />
-                  <div>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/90" />
+                  {/* Avatar floating on edge */}
+                  <div className="absolute bottom-0 left-6 translate-y-1/2">
+                    <img
+                      src={t.photo}
+                      alt={t.name}
+                      className="w-14 h-14 rounded-full object-cover shadow-xl border-2 border-card ring-2 ring-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-6 pt-10 flex flex-col flex-1">
+                  {/* Stars */}
+                  <div className="flex gap-0.5 mb-3">
+                    {Array.from({ length: t.rating }).map((_, k) => (
+                      <Star
+                        key={k}
+                        size={13}
+                        className="text-[hsl(38,95%,55%)] fill-[hsl(38,95%,55%)]"
+                      />
+                    ))}
+                  </div>
+
+                  {/* Quote icon */}
+                  <Quote size={28} className="text-primary/15 mb-2" strokeWidth={1.5} />
+
+                  {/* Quote text */}
+                  <p className="text-sm text-foreground/90 leading-relaxed mb-5 flex-1">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+
+                  {/* Metric highlight */}
+                  <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 mb-5">
+                    <p className="text-xl font-bold text-accent font-[Space_Grotesk] leading-none">
+                      {t.metric.value}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">
+                      {t.metric.label}
+                    </p>
+                  </div>
+
+                  {/* Author */}
+                  <div className="pt-4 border-t border-border/40">
                     <p className="text-sm font-semibold text-foreground">{t.name}</p>
                     <p className="text-[11px] text-muted-foreground">{t.role}</p>
                     <p className="text-[10px] text-muted-foreground/70">{t.location}</p>

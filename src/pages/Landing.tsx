@@ -9,6 +9,7 @@ import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { AfricaMapSection } from "@/components/landing/AfricaMapSection";
 import { StatsSection } from "@/components/landing/StatsSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
+import { SocialProofSection } from "@/components/landing/SocialProofSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 import { CTASection } from "@/components/landing/CTASection";
@@ -26,6 +27,7 @@ const Landing = () => {
       <AfricaMapSection />
       <StatsSection />
       <TestimonialsSection />
+      <SocialProofSection />
       <PricingSection />
       <FAQSection />
       <CTASection />
