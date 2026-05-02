@@ -5,13 +5,45 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── HMAC-SHA256 helper (Deno WebCrypto) ──────────────────────────────────────
+async function computeHmacSha256(secret: string, payload: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Constant-time string comparison to prevent timing attacks
+function secureCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
+    // Read raw body text first (needed for HMAC verification)
+    const rawBody = await req.text();
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -19,12 +51,24 @@ Deno.serve(async (req) => {
 
     // ── Moneroo webhook ──
     // Moneroo sends: { id, status, metadata, amount, currency, ... }
+    // Signature: X-Moneroo-Signature = HMAC-SHA256(MONEROO_WEBHOOK_SECRET, rawBody)
     if (body.id && body.status && body.metadata !== undefined) {
+      const webhookSecret = Deno.env.get("MONEROO_WEBHOOK_SECRET");
+      if (webhookSecret) {
+        const receivedSig = req.headers.get("x-moneroo-signature") || "";
+        const expectedSig = await computeHmacSha256(webhookSecret, rawBody);
+        if (!secureCompare(receivedSig, expectedSig)) {
+          return new Response(JSON.stringify({ error: "Invalid signature" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
       return await handleMonerooWebhook(body, supabaseAdmin);
     }
 
     // ── PayDunya IPN ──
     // PayDunya sends: { response_code, response_text, hash, custom_data, ... }
+    // Verification is done server-to-server via the confirm endpoint (more robust than hash check)
     if (body.response_code !== undefined) {
       return await handlePayDunyaIPN(body, supabaseAdmin);
     }
@@ -110,6 +154,19 @@ async function handleMonerooWebhook(body: any, supabaseAdmin: any) {
   if (!store_id || !transaction_id) {
     return new Response(JSON.stringify({ error: "Missing metadata" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Idempotency: skip if transaction already completed ──
+  const { data: existingTxn } = await supabaseAdmin
+    .from("transactions")
+    .select("status")
+    .eq("id", transaction_id)
+    .maybeSingle();
+
+  if (existingTxn?.status === "completed") {
+    return new Response(JSON.stringify({ received: true, status: "already_processed" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -216,8 +273,8 @@ async function handleMonerooWebhook(body: any, supabaseAdmin: any) {
     );
   }
 
-  // Create invoice
-  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}`;
+  // Create invoice (unique number: year-month-store-txnSuffix)
+  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}-${transaction_id.slice(-6).toUpperCase()}`;
   await supabaseAdmin.from("invoices").insert({
     store_id,
     invoice_number: invoiceNumber,
@@ -249,6 +306,19 @@ async function handlePayDunyaIPN(body: any, supabaseAdmin: any) {
   if (!store_id || !transaction_id) {
     return new Response(JSON.stringify({ error: "Missing custom_data" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Idempotency: skip if transaction already completed ──
+  const { data: existingTxn } = await supabaseAdmin
+    .from("transactions")
+    .select("status")
+    .eq("id", transaction_id)
+    .maybeSingle();
+
+  if (existingTxn?.status === "completed") {
+    return new Response(JSON.stringify({ received: true, status: "already_processed" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -332,7 +402,7 @@ async function handlePayDunyaIPN(body: any, supabaseAdmin: any) {
     );
   }
 
-  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}`;
+  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}-${transaction_id.slice(-6).toUpperCase()}`;
   await supabaseAdmin.from("invoices").insert({
     store_id,
     invoice_number: invoiceNumber,

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { queryClient } from "@/lib/queryClient";
 import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
 
 export interface AppUser {
@@ -9,6 +10,7 @@ export interface AppUser {
   name: string;
   avatar_url: string;
   has_completed_onboarding: boolean;
+  email_confirmed: boolean;
   store_id: string | null;
   role: string | null;
 }
@@ -62,6 +64,7 @@ async function buildAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
     name,
     avatar_url: avatarUrl,
     has_completed_onboarding: !!storeId,
+    email_confirmed: !!supabaseUser.email_confirmed_at,
     store_id: storeId,
     role,
   };
@@ -71,26 +74,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Prevent double buildAppUser when both onAuthStateChange(INITIAL_SESSION) and
+  // getSession() fire concurrently on page load.
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST — handles all post-login events.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
-        // Use setTimeout to avoid deadlock with Supabase client
+        initializedRef.current = true;
+        // setTimeout avoids Supabase client deadlock when calling DB inside the callback
         setTimeout(async () => {
           const appUser = await buildAppUser(newSession.user);
           setUser(appUser);
           setIsLoading(false);
         }, 0);
       } else {
+        initializedRef.current = true;
         setUser(null);
         setIsLoading(false);
       }
     });
 
-    // THEN check for existing session
+    // Fallback: if onAuthStateChange hasn't fired yet (edge cases in some browsers),
+    // getSession ensures we're not stuck in the loading state.
     supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      if (initializedRef.current) return; // onAuthStateChange already handled it
+      initializedRef.current = true;
       setSession(existingSession);
       if (existingSession?.user) {
         const appUser = await buildAppUser(existingSession.user);
@@ -129,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
+    queryClient.clear(); // purge all cached queries so no stale data leaks between users
     setUser(null);
     setSession(null);
   }, []);
