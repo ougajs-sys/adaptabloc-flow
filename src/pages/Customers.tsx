@@ -17,8 +17,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, UserPlus, Star, Users, TrendingUp, Loader2 } from "lucide-react";
+import { Search, UserPlus, Star, Users, TrendingUp, Loader2, Upload } from "lucide-react";
 import { NewCustomerDialog, type NewCustomerFormValues } from "@/components/customers/NewCustomerDialog";
 import { EditCustomerDialog, type EditCustomerFormValues } from "@/components/customers/EditCustomerDialog";
 import { CustomerDetailDialog } from "@/components/customers/CustomerDetailDialog";
@@ -60,6 +64,8 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     if (!storeId) return;
@@ -190,9 +196,98 @@ const Customers = () => {
     );
   }
 
+  // ── CSV import handler ──────────────────────────────────────────────────────
+  const handleCsvImport = async (file: File) => {
+    if (!storeId) return;
+    setImporting(true);
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) {
+      toast({ title: "Fichier vide ou invalide", variant: "destructive" });
+      setImporting(false);
+      return;
+    }
+
+    // Detect delimiter (comma or semicolon)
+    const delim = lines[0].includes(";") ? ";" : ",";
+    const headers = lines[0].split(delim).map((h) => h.trim().toLowerCase().replace(/[^a-z0-9éèêëàâîïôùûü]/g, ""));
+
+    const findCol = (...keys: string[]) => headers.findIndex((h) => keys.some((k) => h.includes(k)));
+    const colName  = findCol("nom", "name", "prenom");
+    const colPhone = findCol("tel", "phone", "mobile");
+    const colEmail = findCol("email", "mail");
+    const colAddr  = findCol("adresse", "address", "ville");
+
+    const rows = lines.slice(1).map((l) => l.split(delim).map((v) => v.trim().replace(/^"|"$/g, "")));
+    const customers = rows
+      .filter((r) => r.length > 1)
+      .map((r) => ({
+        store_id: storeId,
+        name:    colName  >= 0 ? r[colName]  || "Sans nom" : "Sans nom",
+        phone:   colPhone >= 0 ? r[colPhone] || null        : null,
+        email:   colEmail >= 0 ? r[colEmail] || null        : null,
+        address: colAddr  >= 0 ? r[colAddr]  || null        : null,
+        source:  "import_csv",
+        segment: "new",
+      }))
+      .filter((c) => c.name !== "Sans nom" || c.phone);
+
+    if (customers.length === 0) {
+      toast({ title: "Aucun client valide trouvé dans le fichier", variant: "destructive" });
+      setImporting(false);
+      return;
+    }
+
+    // Upsert by phone to avoid duplicates (ignore conflicts)
+    const { error } = await supabase.from("customers").upsert(customers, {
+      onConflict: "store_id,phone",
+      ignoreDuplicates: true,
+    } as any);
+
+    setImporting(false);
+    setImportOpen(false);
+    if (error) {
+      toast({ title: "Erreur import", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: `${customers.length} client(s) importé(s) avec succès` });
+      fetchCustomers();
+    }
+  };
+
   return (
     <>
     <NewCustomerDialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen} onSubmit={handleNewCustomer} />
+
+      {/* ── CSV Import Dialog ──────────────────────────────────────── */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importer des clients (CSV)</DialogTitle>
+            <DialogDescription>
+              Le fichier doit contenir au moins une colonne <strong>nom</strong> et/ou <strong>téléphone</strong>.
+              Les colonnes reconnues : <code>nom</code>, <code>téléphone</code>, <code>email</code>, <code>adresse</code>.
+              Séparateur virgule ou point-virgule. Les doublons (même téléphone) sont ignorés.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="csv-file">Fichier CSV</Label>
+            <Input
+              id="csv-file"
+              type="file"
+              accept=".csv,text/csv"
+              disabled={importing}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleCsvImport(f);
+              }}
+            />
+          </div>
+          <DialogFooter>
+            {importing && <span className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" /> Importation…</span>}
+            <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importing}>Annuler</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     <CustomerDetailDialog
       customer={selectedCustomer}
       open={!!selectedCustomer}
@@ -250,6 +345,9 @@ const Customers = () => {
             filename="clients"
             printTitle="Clients Intramate"
           />
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
+            <Upload size={16} /> Importer CSV
+          </Button>
           <Button size="sm" className="gap-2" onClick={() => setNewCustomerOpen(true)}><UserPlus size={16} /> Ajouter un client</Button>
         </div>
       }

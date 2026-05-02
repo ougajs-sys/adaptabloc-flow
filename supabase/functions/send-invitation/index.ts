@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create client with caller's JWT to verify identity
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -37,7 +36,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, store_id } = await req.json();
+    const { email, store_id, invitation_token } = await req.json();
     if (!email || !store_id) {
       return new Response(JSON.stringify({ error: "Missing email or store_id" }), {
         status: 400,
@@ -57,13 +56,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role client to invite user
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const origin = req.headers.get("origin") || "https://intramate.pro";
 
-    const origin = req.headers.get("origin") || "https://cheerful-longma-30a8e7.netlify.app";
+    // Build redirect URL — includes the invitation token so the accept page
+    // can create the user_role after Supabase authenticates the invitee.
+    const redirectTo = invitation_token
+      ? `${origin}/accept-invitation?token=${invitation_token}`
+      : `${origin}/login`;
 
     const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${origin}/login`,
+      redirectTo,
     });
 
     if (inviteError) {
