@@ -432,7 +432,7 @@ function LandingPageEditor({ page, onBack }: { page: LandingPage; onBack: () => 
   );
 }
 
-// ─── Template Preview (used in editor and public renderer) ───────────
+// ─── Template Preview (mirrored design, scaled for editor sidebar) ────
 export function TemplatePreview({
   data,
   title,
@@ -443,68 +443,79 @@ export function TemplatePreview({
   formId: string | null;
 }) {
   const primary = data.primary_color || "#8B5CF6";
+  const hasImage = !!data.hero_image_url;
+  const heroText = hasImage ? "#fff" : "#111827";
+  const heroSubtext = hasImage ? "rgba(255,255,255,.85)" : "#4B5563";
+
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="h-full overflow-y-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif", background: "#fff", color: "#111827" }}>
+
       {/* Hero */}
-      <div className="relative">
-        {data.hero_image_url ? (
-          <div
-            className="h-64 bg-cover bg-center"
-            style={{ backgroundImage: `url(${data.hero_image_url})` }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-          </div>
+      <div style={{ position: "relative", minHeight: "13rem", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
+        {hasImage ? (
+          <>
+            <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${data.hero_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.72))" }} />
+          </>
         ) : (
-          <div className="h-48" style={{ background: `linear-gradient(135deg, ${primary}, ${primary}88)` }} />
+          <>
+            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, ${primary}14, #fff)` }} />
+            <div style={{ position: "absolute", top: "-3rem", right: "-3rem", width: "10rem", height: "10rem", borderRadius: "50%", background: `radial-gradient(circle, ${primary}28, transparent 68%)`, filter: "blur(20px)", pointerEvents: "none" }} />
+          </>
         )}
-        <div className={`px-6 ${data.hero_image_url ? "absolute bottom-6 left-0 right-0 text-white" : "py-6 text-white"}`}>
-          <h1 className="text-2xl font-bold mb-2">{data.hero_title || title || "Titre"}</h1>
-          {data.hero_subtitle && <p className="text-sm opacity-90">{data.hero_subtitle}</p>}
+        <div style={{ position: "relative", zIndex: 1, padding: "1.25rem", width: "100%" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: ".35rem", padding: ".25rem .75rem", borderRadius: "9999px", fontSize: ".68rem", fontWeight: 600, marginBottom: ".75rem", background: hasImage ? "rgba(255,255,255,.18)" : `${primary}18`, color: hasImage ? "#fff" : primary, border: hasImage ? "1px solid rgba(255,255,255,.25)" : `1px solid ${primary}35` }}>
+            ★ Commande rapide
+          </div>
+          <h1 style={{ fontSize: "1.15rem", fontWeight: 800, color: heroText, lineHeight: 1.25, marginBottom: ".4rem", fontFamily: "'Space Grotesk', sans-serif" }}>
+            {data.hero_title || title || "Titre de votre page"}
+          </h1>
+          {data.hero_subtitle && (
+            <p style={{ fontSize: ".75rem", color: heroSubtext, lineHeight: 1.5, margin: 0 }}>{data.hero_subtitle}</p>
+          )}
         </div>
+      </div>
+
+      {/* CTA button */}
+      <div style={{ padding: ".75rem 1rem", background: "#fff", textAlign: "center" }}>
+        <button style={{ display: "inline-flex", alignItems: "center", gap: ".4rem", padding: ".55rem 1.4rem", borderRadius: "9999px", background: primary, color: "#fff", fontWeight: 700, fontSize: ".78rem", border: "none", cursor: "default", boxShadow: `0 4px 16px ${primary}40` }}>
+          {data.cta_text || "Commander maintenant"}
+        </button>
       </div>
 
       {/* Features */}
       {data.features && data.features.length > 0 && (
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {data.features.map((f, i) => (
-            <div key={i} className="text-center">
-              <div
-                className="w-10 h-10 rounded-full mx-auto flex items-center justify-center mb-2"
-                style={{ backgroundColor: `${primary}22`, color: primary }}
-              >
-                <Check size={18} />
+        <div style={{ padding: ".75rem 1rem", background: "#F9FAFB" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: ".5rem" }}>
+            {data.features.slice(0, 3).map((f, i) => (
+              <div key={i} style={{ background: "#fff", borderRadius: ".75rem", padding: ".75rem .5rem", textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
+                <div style={{ width: "1.75rem", height: "1.75rem", borderRadius: ".4rem", background: `${primary}16`, color: primary, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto .5rem" }}>
+                  <Check size={13} strokeWidth={3} />
+                </div>
+                <p style={{ fontSize: ".65rem", fontWeight: 700, color: "#111827", lineHeight: 1.3, margin: 0 }}>{f.title}</p>
               </div>
-              <p className="text-sm font-semibold">{f.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{f.description}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Form section */}
+      {formId ? (
+        <div style={{ padding: "1rem", background: "#F9FAFB" }}>
+          <div style={{ background: "#fff", borderRadius: "1rem", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,.07)", border: "1px solid #F3F4F6" }}>
+            <div style={{ padding: ".6rem 1rem", borderBottom: "1px solid #F9FAFB", background: "#FAFAFA" }}>
+              <p style={{ fontSize: ".7rem", fontWeight: 600, color: "#6B7280", margin: 0 }}>Formulaire de commande</p>
             </div>
-          ))}
+            <iframe
+              src={`/embed/order?formId=${formId}&color=${primary.replace("#", "")}`}
+              style={{ width: "100%", height: 520, border: "none", display: "block" }}
+              title="Formulaire de commande"
+            />
+          </div>
         </div>
-      )}
-
-      {/* Embedded form */}
-      {formId && (
-        <div className="px-6 pb-6">
-          <iframe
-            src={`/embed/order?formId=${formId}&color=${primary.replace("#", "")}`}
-            className="w-full rounded-lg border"
-            style={{ height: 650, border: "none" }}
-            title="Formulaire de commande"
-          />
-        </div>
-      )}
-
-      {/* Fallback CTA if no form */}
-      {!formId && (
-        <div className="px-6 pb-6">
-          <button
-            className="w-full py-3 rounded-lg text-white font-semibold"
-            style={{ backgroundColor: primary }}
-          >
-            {data.cta_text || "Commander maintenant"}
-          </button>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            (Sélectionnez un formulaire pour activer la commande)
-          </p>
+      ) : (
+        <div style={{ padding: "1.25rem 1rem", textAlign: "center", background: "#F9FAFB" }}>
+          <p style={{ fontSize: ".7rem", color: "#9CA3AF", margin: 0 }}>Sélectionnez un formulaire pour activer la commande</p>
         </div>
       )}
     </div>
@@ -513,10 +524,10 @@ export function TemplatePreview({
 
 // ─── HTML Preview (sandboxed iframe) ─────────────────────────────────
 export function HtmlPreview({ html, formId }: { html: string; formId: string | null }) {
-  const formIframe = formId
-    ? `<iframe src="/embed/order?formId=${formId}" style="width:100%;height:650px;border:none;border-radius:8px;margin-top:20px" title="Formulaire"></iframe>`
+  const formBlock = formId
+    ? `<section style="padding:2rem 1rem;background:#F9FAFB"><div style="max-width:100%;margin:0 auto"><div style="background:#fff;border-radius:1rem;overflow:hidden;box-shadow:0 8px 25px rgba(0,0,0,.07)"><iframe src="/embed/order?formId=${formId}" style="width:100%;height:600px;border:none;display:block" title="Formulaire"></iframe></div></div></section>`
     : "";
-  const fullHtml = (html || "<p style='padding:20px;color:#888'>Aucun HTML — collez votre code dans l'éditeur</p>") + formIframe;
+  const fullHtml = (html || "<p style='padding:20px;color:#888;font-family:sans-serif;text-align:center'>Aucun HTML — collez votre code dans l'éditeur</p>") + formBlock;
 
   return (
     <iframe
