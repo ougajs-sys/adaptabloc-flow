@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OnboardingStepSector } from "@/components/onboarding/OnboardingStepSector";
 import { OnboardingStepModules } from "@/components/onboarding/OnboardingStepModules";
@@ -6,7 +6,9 @@ import { OnboardingStepInfo } from "@/components/onboarding/OnboardingStepInfo";
 import { OnboardingStepLaunch } from "@/components/onboarding/OnboardingStepLaunch";
 import { OnboardingStepCustom } from "@/components/onboarding/OnboardingStepCustom";
 import { Progress } from "@/components/ui/progress";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export interface OnboardingData {
   sector: string;
@@ -18,6 +20,16 @@ export interface OnboardingData {
 }
 
 const Onboarding = () => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  // Skip wizard entirely if user already has a store
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user?.has_completed_onboarding) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isLoading, isAuthenticated, user, navigate]);
+
   const [step, setStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
     sector: "",
@@ -50,6 +62,25 @@ const Onboarding = () => {
     if (step === 3) return <OnboardingStepLaunch data={data} />;
     return null;
   };
+
+  // Wait for auth state to resolve before showing the wizard
+  if (isLoading || (isAuthenticated && !user)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Not signed in — send to login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Already onboarded — useEffect above will redirect; render nothing in the meantime
+  if (user?.has_completed_onboarding) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

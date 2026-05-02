@@ -55,7 +55,16 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (isLoading) return null;
+  // Wait for both session AND user profile to be loaded — prevents
+  // a redirect-to-/onboarding race when session is set but buildAppUser
+  // hasn't populated user.has_completed_onboarding yet.
+  if (isLoading || (isAuthenticated && !user)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user?.has_completed_onboarding) return <Navigate to="/onboarding" replace />;
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
