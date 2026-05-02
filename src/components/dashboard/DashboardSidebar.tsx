@@ -21,6 +21,7 @@ import {
   Tags,
   Filter,
   Warehouse,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -72,6 +73,7 @@ const toolItems: SidebarItem[] = [
   { title: "Templates", url: "/dashboard/templates", icon: Mail, requiredModule: "message_templates", requiredRoles: ["admin"] },
   { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
   { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredRoles: ["admin"] },
+  { title: "Landing Pages", url: "/dashboard/landing-pages", icon: Layers, requiredModule: "landing_pages", requiredRoles: ["admin"] },
 ];
 
 const bottomItems: SidebarItem[] = [
