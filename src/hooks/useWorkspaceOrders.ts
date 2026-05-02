@@ -106,9 +106,19 @@ export function useWorkspaceOrders(statusFilter: string[]) {
 
   const updateStatus = useMutation({
     mutationFn: async ({ dbId, status, notes }: { dbId: string; status: OrderPipelineStatus; notes?: string }) => {
+      // When a caller picks up a 'new' order, use the atomic RPC to prevent
+      // two callers claiming the same order simultaneously.
+      if (status === "caller_pending" && user?.id) {
+        const { data: claimed, error: claimError } = await supabase
+          .rpc("claim_order_for_caller" as never, { p_order_id: dbId, p_user_id: user.id } as never);
+        if (claimError) throw claimError;
+        if (!claimed) throw new Error("Cette commande a déjà été prise en charge par un autre caller.");
+        return;
+      }
+
       const updateData: any = { status: mapToDbStatus(status) };
       if (notes !== undefined) updateData.notes = notes;
-      
+
       // Set confirmed_by / prepared_by based on role action
       if (status === "confirmed" && user?.id) updateData.confirmed_by = user.id;
       if (status === "preparing" && user?.id) updateData.prepared_by = user.id;

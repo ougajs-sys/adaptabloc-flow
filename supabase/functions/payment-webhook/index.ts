@@ -113,6 +113,19 @@ async function handleMonerooWebhook(body: any, supabaseAdmin: any) {
     });
   }
 
+  // ── Idempotency: skip if transaction already completed ──
+  const { data: existingTxn } = await supabaseAdmin
+    .from("transactions")
+    .select("status")
+    .eq("id", transaction_id)
+    .maybeSingle();
+
+  if (existingTxn?.status === "completed") {
+    return new Response(JSON.stringify({ received: true, status: "already_processed" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const modules: string[] = modulesRaw ? JSON.parse(modulesRaw) : [];
 
   // Verify payment status with Moneroo API
@@ -216,8 +229,8 @@ async function handleMonerooWebhook(body: any, supabaseAdmin: any) {
     );
   }
 
-  // Create invoice
-  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}`;
+  // Create invoice (unique number: year-month-store-txnSuffix)
+  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}-${transaction_id.slice(-6).toUpperCase()}`;
   await supabaseAdmin.from("invoices").insert({
     store_id,
     invoice_number: invoiceNumber,
@@ -249,6 +262,19 @@ async function handlePayDunyaIPN(body: any, supabaseAdmin: any) {
   if (!store_id || !transaction_id) {
     return new Response(JSON.stringify({ error: "Missing custom_data" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Idempotency: skip if transaction already completed ──
+  const { data: existingTxn } = await supabaseAdmin
+    .from("transactions")
+    .select("status")
+    .eq("id", transaction_id)
+    .maybeSingle();
+
+  if (existingTxn?.status === "completed") {
+    return new Response(JSON.stringify({ received: true, status: "already_processed" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -332,7 +358,7 @@ async function handlePayDunyaIPN(body: any, supabaseAdmin: any) {
     );
   }
 
-  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}`;
+  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}-${transaction_id.slice(-6).toUpperCase()}`;
   await supabaseAdmin.from("invoices").insert({
     store_id,
     invoice_number: invoiceNumber,

@@ -304,7 +304,7 @@ function HtmlMode({ page }: { page: PublicPage }) {
     <div style={{ minHeight: "100vh", background: "#fff", display: "flex", flexDirection: "column" }}>
       <iframe
         srcDoc={base + formBlock}
-        sandbox="allow-forms allow-popups allow-same-origin"
+        sandbox="allow-forms allow-popups"
         style={{ flex: 1, width: "100%", border: "none", minHeight: "100vh" }}
         title={page.title}
       />
