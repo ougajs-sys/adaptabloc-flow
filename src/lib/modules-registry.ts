@@ -363,6 +363,30 @@ export const modulesRegistry: ModuleDefinition[] = [
     available: false,
   },
 
+  // === TIER 1 – Quotas supplémentaires ===
+  {
+    id: "extra_forms",
+    name: "+3 Formulaires",
+    description: "Ajoutez 3 formulaires de commande supplémentaires au-delà de la limite gratuite (2 → 5).",
+    icon: FormInput,
+    tier: "tier1",
+    price: 2000,
+    features: ["extra_forms_quota"],
+    category: "Outils",
+    available: true,
+  },
+  {
+    id: "extra_landing_pages",
+    name: "+5 Landing Pages",
+    description: "Créez jusqu'à 5 landing pages supplémentaires pour promouvoir vos produits (1 → 6).",
+    icon: Layers,
+    tier: "tier1",
+    price: 2500,
+    features: ["extra_landing_pages_quota"],
+    category: "Outils",
+    available: true,
+  },
+
   // === FREE – Formulaire embarqué ===
   {
     id: "embed_forms",

@@ -115,20 +115,27 @@ const Team = () => {
   const inviteMutation = useMutation({
     mutationFn: async (values: { email: string; role: TeamRole }) => {
       const dbRole = frontToDbRole[values.role] as any;
-      // 1. Insert invitation in DB
-      const { error } = await supabase.from("team_invitations").insert({
-        store_id: storeId!,
-        email: values.email,
-        role: dbRole,
-      });
+      // 1. Insert invitation in DB — retrieve the generated token
+      const { data: inv, error } = await supabase
+        .from("team_invitations")
+        .insert({ store_id: storeId!, email: values.email, role: dbRole })
+        .select("token")
+        .single();
       if (error) throw error;
-      // 2. Call edge function to send the actual email
+      // 2. Send invitation email via edge function, passing the token so the
+      //    accept-invitation page can create the user_role after auth.
       const { error: fnError } = await supabase.functions.invoke("send-invitation", {
-        body: { email: values.email, store_id: storeId },
+        body: { email: values.email, store_id: storeId, invitation_token: inv?.token },
       });
       if (fnError) {
         console.error("send-invitation error:", fnError);
-        // Don't throw - invitation is saved, email sending is best-effort
+        // Invitation is saved in DB; email sending failure is non-blocking
+        // but we show a warning so the admin knows.
+        toast({
+          title: "Invitation enregistrée",
+          description: "L'email n'a pas pu être envoyé automatiquement. Communiquez le lien manuellement si nécessaire.",
+          variant: "destructive",
+        });
       }
     },
     onSuccess: () => {

@@ -10,6 +10,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import VerifyEmail from "./pages/VerifyEmail";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import Products from "./pages/Products";
@@ -122,6 +123,7 @@ const AppRoutes = () => (
     <Route path="/" element={<Landing />} />
     <Route path="/login" element={<Login />} />
     <Route path="/verify-email" element={<VerifyEmail />} />
+    <Route path="/accept-invitation" element={<AcceptInvitation />} />
     <Route path="/onboarding" element={<Onboarding />} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/dashboard/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

@@ -21,6 +21,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useModules } from "@/contexts/ModulesContext";
+import { useNavigate } from "react-router-dom";
 
 const FREE_FORMS_LIMIT = 2;
 
@@ -371,6 +373,8 @@ function FormEditor({ form, onBack }: { form: EmbedForm; onBack: () => void }) {
 // ─── Main Component (list view) ───────────────────────────────────
 const EmbedForms = () => {
   const { user } = useAuth();
+  const { hasModule } = useModules();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -394,7 +398,9 @@ const EmbedForms = () => {
     enabled: !!user?.store_id,
   });
 
-  const atLimit = forms.length >= FREE_FORMS_LIMIT;
+  const hasExtraForms = hasModule("extra_forms");
+  const effectiveLimit = hasExtraForms ? FREE_FORMS_LIMIT + 3 : FREE_FORMS_LIMIT;
+  const atLimit = forms.length >= effectiveLimit;
 
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -518,18 +524,25 @@ const EmbedForms = () => {
           </p>
         </div>
 
-        {/* Free tier banner */}
+        {/* Quota banner */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-start gap-3">
             <Info size={18} className="text-primary mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold">Plan gratuit — {forms.length} / {FREE_FORMS_LIMIT} formulaires utilisés</p>
+            <div className="text-sm flex-1">
+              <p className="font-semibold">
+                {hasExtraForms ? "Plan étendu" : "Plan gratuit"} — {forms.length} / {effectiveLimit} formulaires utilisés
+              </p>
               <p className="text-muted-foreground mt-0.5">
                 {atLimit
-                  ? "Vous avez atteint la limite gratuite. Contactez-nous pour passer à la version Pro et créer des formulaires illimités."
-                  : `Il vous reste ${FREE_FORMS_LIMIT - forms.length} formulaire${FREE_FORMS_LIMIT - forms.length > 1 ? "s" : ""} disponible${FREE_FORMS_LIMIT - forms.length > 1 ? "s" : ""} dans votre plan gratuit.`}
+                  ? "Limite atteinte. Achetez le module \"+3 Formulaires\" pour en créer davantage."
+                  : `Il vous reste ${effectiveLimit - forms.length} formulaire${effectiveLimit - forms.length > 1 ? "s" : ""} disponible${effectiveLimit - forms.length > 1 ? "s" : ""}.`}
               </p>
             </div>
+            {atLimit && (
+              <Button size="sm" onClick={() => navigate("/dashboard/modules")} className="shrink-0">
+                Acheter +3
+              </Button>
+            )}
           </CardContent>
         </Card>
 

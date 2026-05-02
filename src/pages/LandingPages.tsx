@@ -27,6 +27,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useModules } from "@/contexts/ModulesContext";
+import { useNavigate } from "react-router-dom";
 
 const FREE_PAGES_LIMIT = 1;
 
@@ -543,6 +545,8 @@ export function HtmlPreview({ html, formId }: { html: string; formId: string | n
 // ─── Main list view ──────────────────────────────────────────────────
 const LandingPagesContent = () => {
   const { user } = useAuth();
+  const { hasModule } = useModules();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -566,7 +570,9 @@ const LandingPagesContent = () => {
     enabled: !!user?.store_id,
   });
 
-  const atLimit = pages.length >= FREE_PAGES_LIMIT;
+  const hasExtraPages = hasModule("extra_landing_pages");
+  const effectiveLimit = hasExtraPages ? FREE_PAGES_LIMIT + 5 : FREE_PAGES_LIMIT;
+  const atLimit = pages.length >= effectiveLimit;
 
   const createMutation = useMutation({
     mutationFn: async (title: string) => {
@@ -691,18 +697,25 @@ const LandingPagesContent = () => {
           </p>
         </div>
 
-        {/* Free tier banner */}
+        {/* Quota banner */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-start gap-3">
             <Layers size={18} className="text-primary mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold">Plan gratuit — {pages.length} / {FREE_PAGES_LIMIT} page{FREE_PAGES_LIMIT > 1 ? "s" : ""} utilisée{pages.length > 1 ? "s" : ""}</p>
+            <div className="text-sm flex-1">
+              <p className="font-semibold">
+                {hasExtraPages ? "Plan étendu" : "Plan gratuit"} — {pages.length} / {effectiveLimit} page{effectiveLimit > 1 ? "s" : ""} utilisée{pages.length > 1 ? "s" : ""}
+              </p>
               <p className="text-muted-foreground mt-0.5">
                 {atLimit
-                  ? "Vous avez atteint la limite gratuite. Contactez-nous pour passer à la version Pro et créer des pages illimitées."
-                  : `Il vous reste ${FREE_PAGES_LIMIT - pages.length} page${FREE_PAGES_LIMIT - pages.length > 1 ? "s" : ""} disponible${FREE_PAGES_LIMIT - pages.length > 1 ? "s" : ""}.`}
+                  ? "Limite atteinte. Achetez le module \"+5 Landing Pages\" pour en créer davantage."
+                  : `Il vous reste ${effectiveLimit - pages.length} page${effectiveLimit - pages.length > 1 ? "s" : ""} disponible${effectiveLimit - pages.length > 1 ? "s" : ""}.`}
               </p>
             </div>
+            {atLimit && (
+              <Button size="sm" onClick={() => navigate("/dashboard/modules")} className="shrink-0">
+                Acheter +5
+              </Button>
+            )}
           </CardContent>
         </Card>
 
