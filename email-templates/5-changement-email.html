@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirmez votre nouvelle adresse email – Intramate</title>
+</head>
+<body style="margin:0;padding:0;background-color:#EEEDF8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EEEDF8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(101,66,240,0.10);">
+
+          <!-- HEADER GRADIENT -->
+          <tr>
+            <td align="center" style="background:linear-gradient(135deg,#6542F0 0%,#AB30E8 100%);padding:40px 32px 36px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="background:rgba(255,255,255,0.18);border-radius:12px;width:52px;height:52px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-1px;vertical-align:middle;text-align:center;padding:0 8px;">
+                    IM
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:14px;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                    intramate
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:4px;font-size:12px;color:rgba(255,255,255,0.70);letter-spacing:2px;text-transform:uppercase;">
+                    Votre espace de travail
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:44px 48px 36px;">
+              <!-- Icon -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px;">
+                <tr>
+                  <td align="center" style="background:#F0FDF9;border-radius:50%;width:64px;height:64px;font-size:28px;line-height:64px;text-align:center;">
+                    📬
+                  </td>
+                </tr>
+              </table>
+
+              <h1 style="margin:0 0 12px;text-align:center;font-size:24px;font-weight:700;color:#131924;letter-spacing:-0.5px;">
+                Confirmez votre nouvelle adresse
+              </h1>
+              <p style="margin:0 0 8px;text-align:center;font-size:15px;color:#6B7280;line-height:1.6;">
+                Vous avez demandé à changer l'adresse email associée à votre compte <strong style="color:#131924;">intramate.pro</strong>.
+              </p>
+              <p style="margin:0 0 28px;text-align:center;font-size:15px;color:#6B7280;line-height:1.6;">
+                Cliquez sur le bouton ci-dessous pour confirmer votre nouvelle adresse. Votre ancienne adresse restera active jusqu'à la confirmation.
+              </p>
+
+              <!-- Change summary box -->
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:32px;">
+                <tr>
+                  <td style="background:#F8F7FE;border-radius:12px;padding:20px 24px;">
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding-bottom:10px;">
+                          <p style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;font-weight:600;">Ancienne adresse</p>
+                          <p style="margin:4px 0 0;font-size:14px;color:#6B7280;text-decoration:line-through;">{{ .Email }}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="border-top:1px dashed #E5E7EB;padding-top:10px;">
+                          <p style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;font-weight:600;">Nouvelle adresse</p>
+                          <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#17CFAA;">{{ .NewEmail }}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                <tr>
+                  <td align="center" style="background:linear-gradient(135deg,#6542F0 0%,#AB30E8 100%);border-radius:10px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank"
+                       style="display:inline-block;padding:15px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.2px;">
+                      Confirmer ma nouvelle adresse
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:16px 0 0;text-align:center;font-size:13px;color:#9CA3AF;">
+                Ce lien expire dans <strong>24 heures</strong>
+              </p>
+
+              <!-- Fallback URL -->
+              <p style="margin:20px 0 0;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7;">
+                Lien de secours :<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#6542F0;word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- DIVIDER -->
+          <tr>
+            <td style="padding:0 48px;">
+              <div style="height:1px;background-color:#F0F1F7;"></div>
+            </td>
+          </tr>
+
+          <!-- SECURITY NOTE -->
+          <tr>
+            <td style="padding:24px 48px 32px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#FEF2F2;border-radius:10px;padding:16px 20px;border:1px solid #FECACA;">
+                <tr>
+                  <td style="font-size:13px;color:#7F1D1D;line-height:1.6;">
+                    🚨 <strong>Vous n'avez pas demandé ce changement ?</strong><br />
+                    Ignorez cet email. Votre adresse actuelle restera active et inchangée. Si vous pensez que votre compte a été compromis, réinitialisez immédiatement votre mot de passe.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#F8F7FE;border-top:1px solid #EEECFC;padding:24px 48px;border-radius:0 0 16px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="font-size:13px;color:#9CA3AF;line-height:1.8;">
+                    <strong style="color:#6542F0;">intramate.pro</strong><br />
+                    Votre plateforme de gestion d'équipe<br />
+                    <span style="font-size:11px;">© 2026 Intramate. Tous droits réservés.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
