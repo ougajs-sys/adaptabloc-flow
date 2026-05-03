@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vous avez été invité – Intramate</title>
+</head>
+<body style="margin:0;padding:0;background-color:#EEEDF8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EEEDF8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(101,66,240,0.10);">
+
+          <!-- HEADER GRADIENT -->
+          <tr>
+            <td align="center" style="background:linear-gradient(135deg,#6542F0 0%,#AB30E8 100%);padding:40px 32px 36px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="background:rgba(255,255,255,0.18);border-radius:12px;width:52px;height:52px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-1px;vertical-align:middle;text-align:center;padding:0 8px;">
+                    IM
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:14px;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                    intramate
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:4px;font-size:12px;color:rgba(255,255,255,0.70);letter-spacing:2px;text-transform:uppercase;">
+                    Votre espace de travail
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ACCENT BAR -->
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg,#17CFAA 0%,#6542F0 100%);"></td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:44px 48px 36px;">
+              <!-- Icon -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px;">
+                <tr>
+                  <td align="center" style="background:#F0FDF9;border-radius:50%;width:64px;height:64px;font-size:28px;line-height:64px;text-align:center;">
+                    🤝
+                  </td>
+                </tr>
+              </table>
+
+              <h1 style="margin:0 0 12px;text-align:center;font-size:24px;font-weight:700;color:#131924;letter-spacing:-0.5px;">
+                Vous avez été invité !
+              </h1>
+              <p style="margin:0 0 8px;text-align:center;font-size:15px;color:#6B7280;line-height:1.6;">
+                Un administrateur vous invite à rejoindre son équipe sur <strong style="color:#131924;">intramate.pro</strong>.
+              </p>
+              <p style="margin:0 0 32px;text-align:center;font-size:15px;color:#6B7280;line-height:1.6;">
+                Acceptez l'invitation pour accéder à votre espace de travail. Vous pourrez ensuite définir votre mot de passe et vous connecter à tout moment.
+              </p>
+
+              <!-- Invite highlight box -->
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:32px;">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#F0ECFD,#F0FDF9);border-radius:12px;padding:20px 24px;border-left:4px solid #6542F0;">
+                    <p style="margin:0;font-size:13px;color:#6B7280;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Votre rôle</p>
+                    <p style="margin:6px 0 0;font-size:16px;font-weight:700;color:#131924;">Membre de l'équipe</p>
+                    <p style="margin:4px 0 0;font-size:13px;color:#9CA3AF;">Accès à votre tableau de bord dès la confirmation</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                <tr>
+                  <td align="center" style="background:linear-gradient(135deg,#6542F0 0%,#AB30E8 100%);border-radius:10px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank"
+                       style="display:inline-block;padding:15px 40px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.2px;">
+                      Accepter l'invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:16px 0 0;text-align:center;font-size:13px;color:#9CA3AF;">
+                Ce lien est valable <strong>72 heures</strong>
+              </p>
+
+              <!-- Fallback URL -->
+              <p style="margin:20px 0 0;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7;">
+                Lien de secours :<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#6542F0;word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- STEPS SECTION -->
+          <tr>
+            <td style="padding:0 48px 36px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F8F7FE;border-radius:12px;padding:24px;">
+                <tr>
+                  <td>
+                    <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#131924;text-transform:uppercase;letter-spacing:1px;">Comment ça marche ?</p>
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding-bottom:12px;">
+                          <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="width:28px;height:28px;background:#6542F0;border-radius:50%;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:28px;vertical-align:top;">1</td>
+                              <td style="padding-left:12px;font-size:13px;color:#4B5563;vertical-align:top;padding-top:5px;">Cliquez sur « Accepter l'invitation »</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding-bottom:12px;">
+                          <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="width:28px;height:28px;background:#6542F0;border-radius:50%;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:28px;vertical-align:top;">2</td>
+                              <td style="padding-left:12px;font-size:13px;color:#4B5563;vertical-align:top;padding-top:5px;">Définissez votre mot de passe sécurisé</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="width:28px;height:28px;background:#17CFAA;border-radius:50%;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:28px;vertical-align:top;">3</td>
+                              <td style="padding-left:12px;font-size:13px;color:#4B5563;vertical-align:top;padding-top:5px;">Accédez à votre espace et commencez à travailler</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#F8F7FE;border-top:1px solid #EEECFC;padding:24px 48px;border-radius:0 0 16px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center" style="font-size:13px;color:#9CA3AF;line-height:1.8;">
+                    <strong style="color:#6542F0;">intramate.pro</strong><br />
+                    Votre plateforme de gestion d'équipe<br />
+                    <span style="font-size:11px;">© 2026 Intramate. Tous droits réservés.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
