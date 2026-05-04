@@ -74,6 +74,7 @@ const Orders = () => {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -128,137 +129,147 @@ const Orders = () => {
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const handleNewOrder = async (values: NewOrderFormValues) => {
-    if (!storeId) return;
+    if (!storeId || submitting) return;
+    setSubmitting(true);
+    try {
+      const orderNumber = `CMD-${Date.now().toString().slice(-6)}`;
+      const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
 
-    // Generate order number
-    const orderNumber = `CMD-${Date.now().toString().slice(-6)}`;
-    const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
-
-    // Find or create customer
-    let customerId: string | null = null;
-    if (values.customer && values.phone) {
-      const { data: existing } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("store_id", storeId)
-        .eq("phone", values.phone)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        customerId = existing[0].id;
-      } else {
-        const { data: newCust } = await supabase
+      let customerId: string | null = null;
+      if (values.customer && values.phone) {
+        const { data: existing } = await supabase
           .from("customers")
-          .insert({ store_id: storeId, name: values.customer, phone: values.phone, email: values.email || null })
           .select("id")
-          .single();
-        customerId = newCust?.id || null;
+          .eq("store_id", storeId)
+          .eq("phone", values.phone)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          customerId = existing[0].id;
+        } else {
+          const { data: newCust } = await supabase
+            .from("customers")
+            .insert({ store_id: storeId, name: values.customer, phone: values.phone, email: values.email || null })
+            .select("id")
+            .single();
+          customerId = newCust?.id || null;
+        }
       }
-    }
 
-    const { data: newOrder, error } = await supabase
-      .from("orders")
-      .insert({
-        store_id: storeId,
-        order_number: orderNumber,
-        customer_id: customerId,
-        total_amount: totalAmount,
-        shipping_address: values.address,
-        status: "new",
-        created_by: user?.id,
-      })
-      .select()
-      .single();
+      const { data: newOrder, error } = await supabase
+        .from("orders")
+        .insert({
+          store_id: storeId,
+          order_number: orderNumber,
+          customer_id: customerId,
+          total_amount: totalAmount,
+          shipping_address: values.address,
+          status: "new",
+          created_by: user?.id,
+        })
+        .select()
+        .single();
 
-    if (error || !newOrder) {
-      toast({ title: "Erreur", description: error?.message, variant: "destructive" });
-      return;
-    }
+      if (error || !newOrder) {
+        toast({ title: "Erreur", description: error?.message, variant: "destructive" });
+        return;
+      }
 
-    // Insert order items with product_id lookup + stock deduction
-    if (values.items.length > 0) {
-      // Lookup product IDs by name for this store
-      const { data: storeProducts } = await supabase
-        .from("products")
-        .select("id, name, stock")
-        .eq("store_id", storeId)
-        .eq("is_active", true);
+      if (values.items.length > 0) {
+        // Look up product_id by name; the DB trigger will deduct stock atomically.
+        const { data: storeProducts } = await supabase
+          .from("products")
+          .select("id, name")
+          .eq("store_id", storeId)
+          .eq("is_active", true);
 
-      const productMap = new Map(
-        (storeProducts || []).map((p) => [p.name, p])
-      );
+        const productMap = new Map((storeProducts || []).map((p) => [p.name, p.id]));
 
-      const itemsToInsert = values.items.map((i) => {
-        const product = productMap.get(i.name);
-        return {
+        const itemsToInsert = values.items.map((i) => ({
           order_id: newOrder.id,
-          product_id: product?.id || null,
+          product_id: productMap.get(i.name) || null,
           product_name: i.name,
           quantity: i.qty,
           unit_price: i.price,
           total_price: i.qty * i.price,
-        };
-      });
+        }));
 
-      await supabase.from("order_items").insert(itemsToInsert);
-
-      // Deduct stock for each product
-      for (const item of itemsToInsert) {
-        if (item.product_id) {
-          const product = productMap.get(item.product_name);
-          if (product && product.stock != null) {
-            const newStock = Math.max(0, product.stock - item.quantity);
-            await supabase
-              .from("products")
-              .update({ stock: newStock })
-              .eq("id", item.product_id);
-          }
+        const { error: itemsErr } = await supabase.from("order_items").insert(itemsToInsert);
+        if (itemsErr) {
+          toast({ title: "Erreur sur les articles", description: itemsErr.message, variant: "destructive" });
         }
       }
-    }
 
-    toast({ title: "Commande créée" });
-    fetchOrders();
+      toast({ title: "Commande créée" });
+      setNewOrderOpen(false);
+      await fetchOrders();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEditOrder = async (values: EditOrderFormValues) => {
-    if (!editingOrder) return;
-    const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
+    if (!editingOrder || !storeId || submitting) return;
+    setSubmitting(true);
+    try {
+      const totalAmount = values.items.reduce((s, i) => s + i.qty * i.price, 0);
 
-    await supabase.from("orders").update({
-      shipping_address: values.address,
-      total_amount: totalAmount,
-      payment_status: values.paymentStatus,
-    }).eq("id", editingOrder.dbId);
+      const { error: updErr } = await supabase.from("orders").update({
+        shipping_address: values.address,
+        total_amount: totalAmount,
+        payment_status: values.paymentStatus,
+      }).eq("id", editingOrder.dbId);
 
-    // Replace order items
-    await supabase.from("order_items").delete().eq("order_id", editingOrder.dbId);
-    await supabase.from("order_items").insert(
-      values.items.map((i) => ({
-        order_id: editingOrder.dbId,
-        product_name: i.name,
-        quantity: i.qty,
-        unit_price: i.price,
-        total_price: i.qty * i.price,
-      }))
-    );
+      if (updErr) {
+        toast({ title: "Erreur", description: updErr.message, variant: "destructive" });
+        return;
+      }
 
-    toast({ title: "Commande modifiée" });
-    setEditingOrder(null);
-    fetchOrders();
+      // Look up product IDs so the DB trigger can adjust stock per product.
+      const { data: storeProducts } = await supabase
+        .from("products")
+        .select("id, name")
+        .eq("store_id", storeId)
+        .eq("is_active", true);
+      const productMap = new Map((storeProducts || []).map((p) => [p.name, p.id]));
+
+      // Replace order items: DELETE restores stock via trigger, then INSERT deducts again.
+      await supabase.from("order_items").delete().eq("order_id", editingOrder.dbId);
+      await supabase.from("order_items").insert(
+        values.items.map((i) => ({
+          order_id: editingOrder.dbId,
+          product_id: productMap.get(i.name) || null,
+          product_name: i.name,
+          quantity: i.qty,
+          unit_price: i.price,
+          total_price: i.qty * i.price,
+        }))
+      );
+
+      toast({ title: "Commande modifiée" });
+      setEditingOrder(null);
+      await fetchOrders();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteOrder = async () => {
-    if (!deletingOrder) return;
-    await supabase.from("order_items").delete().eq("order_id", deletingOrder.dbId);
-    const { error } = await supabase.from("orders").delete().eq("id", deletingOrder.dbId);
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Commande supprimée" });
+    if (!deletingOrder || submitting) return;
+    setSubmitting(true);
+    try {
+      // The DB trigger restores stock automatically (BEFORE DELETE on orders).
+      const { error } = await supabase.from("orders").delete().eq("id", deletingOrder.dbId);
+      if (error) {
+        toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Commande supprimée" });
+      }
+      setDeletingOrder(null);
+      await fetchOrders();
+    } finally {
+      setSubmitting(false);
     }
-    setDeletingOrder(null);
-    fetchOrders();
   };
 
   const filtered = orders.filter((o) => {
@@ -343,8 +354,8 @@ const Orders = () => {
           <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+          <AlertDialogCancel disabled={submitting}>Annuler</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteOrder} disabled={submitting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{submitting ? "Suppression…" : "Supprimer"}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
