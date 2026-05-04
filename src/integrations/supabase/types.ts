@@ -455,7 +455,6 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
-          payment_status: Database["public"]["Enums"]["payment_status"]
           prepared_by: string | null
           shipping_address: string | null
           shipping_city: string | null
@@ -473,7 +472,6 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
-          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -491,7 +489,6 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
-          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -1060,6 +1057,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_store_for_user: {
+        Args: {
+          p_email?: string
+          p_modules?: string[]
+          p_name: string
+          p_phone?: string
+          p_sector?: string
+        }
+        Returns: string
+      }
       get_user_store_ids: { Args: never; Returns: string[] }
       has_role: {
         Args: {
@@ -1104,7 +1111,6 @@ export type Database = {
         | "delivered"
         | "returned"
         | "cancelled"
-      payment_status: "pending" | "paid" | "refunded"
       ticket_priority: "low" | "medium" | "high"
       ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
@@ -1268,7 +1274,6 @@ export const Constants = {
         "returned",
         "cancelled",
       ],
-      payment_status: ["pending", "paid", "refunded"],
       ticket_priority: ["low", "medium", "high"],
       ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
