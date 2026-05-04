@@ -145,6 +145,42 @@ export type Database = {
           },
         ]
       }
+      customer_segments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criteria: Json
+          customer_count: number
+          customer_ids: Json
+          id: string
+          name: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          customer_count?: number
+          customer_ids?: Json
+          id?: string
+          name: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          customer_count?: number
+          customer_ids?: Json
+          id?: string
+          name?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -157,6 +193,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           segment: string | null
+          shipping_city: string | null
           source: string | null
           store_id: string
           updated_at: string
@@ -172,6 +209,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           segment?: string | null
+          shipping_city?: string | null
           source?: string | null
           store_id: string
           updated_at?: string
@@ -187,6 +225,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           segment?: string | null
+          shipping_city?: string | null
           source?: string | null
           store_id?: string
           updated_at?: string
@@ -455,6 +494,7 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
           prepared_by: string | null
           shipping_address: string | null
           shipping_city: string | null
@@ -472,6 +512,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -489,6 +530,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           prepared_by?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -665,7 +707,6 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           email: string | null
-          facebook_id: string | null
           id: string
           name: string
           phone: string | null
@@ -677,7 +718,6 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
-          facebook_id?: string | null
           id?: string
           name: string
           phone?: string | null
@@ -689,7 +729,6 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           email?: string | null
-          facebook_id?: string | null
           id?: string
           name?: string
           phone?: string | null
@@ -1111,6 +1150,7 @@ export type Database = {
         | "delivered"
         | "returned"
         | "cancelled"
+      payment_status: "pending" | "paid" | "refunded" | "failed"
       ticket_priority: "low" | "medium" | "high"
       ticket_status: "open" | "in_progress" | "resolved" | "closed"
     }
@@ -1274,6 +1314,7 @@ export const Constants = {
         "returned",
         "cancelled",
       ],
+      payment_status: ["pending", "paid", "refunded", "failed"],
       ticket_priority: ["low", "medium", "high"],
       ticket_status: ["open", "in_progress", "resolved", "closed"],
     },
