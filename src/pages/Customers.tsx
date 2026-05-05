@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { normalize } from "@/lib/normalize";
 import { usePagination } from "@/hooks/usePagination";
 import { DataPagination } from "@/components/ui/data-pagination";
@@ -56,8 +57,7 @@ const Customers = () => {
   const { user } = useAuth();
   const storeId = user?.store_id;
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [segmentFilter, setSegmentFilter] = useState("all");
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
@@ -67,62 +67,61 @@ const Customers = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  const fetchCustomers = useCallback(async () => {
-    if (!storeId) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
+  const { data: customers = [], isLoading: loading } = useQuery<Customer[]>({
+    queryKey: ["customers", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("store_id", storeId!)
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
-    // Fetch order stats per customer
-    const { data: ordersData } = await supabase
-      .from("orders")
-      .select("customer_id, total_amount, created_at")
-      .eq("store_id", storeId);
-
-    // Build stats map
-    const statsMap: Record<string, { count: number; spent: number; lastDate: string }> = {};
-    (ordersData || []).forEach((o) => {
-      if (!o.customer_id) return;
-      if (!statsMap[o.customer_id]) {
-        statsMap[o.customer_id] = { count: 0, spent: 0, lastDate: o.created_at };
+      if (error) {
+        toast({ title: "Erreur", description: error.message, variant: "destructive" });
+        throw error;
       }
-      statsMap[o.customer_id].count++;
-      statsMap[o.customer_id].spent += o.total_amount || 0;
-      if (o.created_at > statsMap[o.customer_id].lastDate) {
-        statsMap[o.customer_id].lastDate = o.created_at;
-      }
-    });
 
-    const mapped: Customer[] = (data || []).map((c) => {
-      const stats = statsMap[c.id];
-      return {
-        id: c.id,
-        name: c.name,
-        phone: c.phone || "",
-        email: c.email || "",
-        segment: c.segment || "standard",
-        totalOrders: stats?.count ?? 0,
-        totalSpent: stats?.spent ?? 0,
-        lastOrder: stats?.lastDate ?? c.updated_at,
-        loyaltyPoints: c.loyalty_points ?? 0,
-        joinDate: c.created_at,
-      };
-    });
+      const { data: ordersData } = await supabase
+        .from("orders")
+        .select("customer_id, total_amount, created_at")
+        .eq("store_id", storeId!);
 
-    setCustomers(mapped);
-    setLoading(false);
-  }, [storeId]);
+      const statsMap: Record<string, { count: number; spent: number; lastDate: string }> = {};
+      (ordersData || []).forEach((o) => {
+        if (!o.customer_id) return;
+        if (!statsMap[o.customer_id]) {
+          statsMap[o.customer_id] = { count: 0, spent: 0, lastDate: o.created_at };
+        }
+        statsMap[o.customer_id].count++;
+        statsMap[o.customer_id].spent += o.total_amount || 0;
+        if (o.created_at > statsMap[o.customer_id].lastDate) {
+          statsMap[o.customer_id].lastDate = o.created_at;
+        }
+      });
 
-  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+      return (data || []).map((c) => {
+        const stats = statsMap[c.id];
+        return {
+          id: c.id,
+          name: c.name,
+          phone: c.phone || "",
+          email: c.email || "",
+          segment: c.segment || "standard",
+          totalOrders: stats?.count ?? 0,
+          totalSpent: stats?.spent ?? 0,
+          lastOrder: stats?.lastDate ?? c.updated_at,
+          loyaltyPoints: c.loyalty_points ?? 0,
+          joinDate: c.created_at,
+        };
+      });
+    },
+  });
+
+  const invalidateCustomers = () => {
+    queryClient.invalidateQueries({ queryKey: ["customers", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard", storeId] });
+  };
 
   const handleNewCustomer = async (values: NewCustomerFormValues) => {
     if (!storeId) return;
@@ -140,7 +139,7 @@ const Customers = () => {
       return;
     }
     toast({ title: "Client ajouté" });
-    fetchCustomers();
+    invalidateCustomers();
   };
 
   const handleEditCustomer = async (values: EditCustomerFormValues) => {
@@ -157,7 +156,7 @@ const Customers = () => {
       toast({ title: "Client modifié" });
     }
     setEditingCustomer(null);
-    fetchCustomers();
+    invalidateCustomers();
   };
 
   const handleDeleteCustomer = async () => {
@@ -169,7 +168,7 @@ const Customers = () => {
       toast({ title: "Client supprimé" });
     }
     setDeletingCustomer(null);
-    fetchCustomers();
+    invalidateCustomers();
   };
 
   const filtered = customers.filter((c) => {
@@ -250,7 +249,7 @@ const Customers = () => {
       toast({ title: "Erreur import", description: error.message, variant: "destructive" });
     } else {
       toast({ title: `${customers.length} client(s) importé(s) avec succès` });
-      fetchCustomers();
+      invalidateCustomers();
     }
   };
 

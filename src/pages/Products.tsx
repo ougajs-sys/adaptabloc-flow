@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { normalize } from "@/lib/normalize";
 import { usePagination } from "@/hooks/usePagination";
 import { DataPagination } from "@/components/ui/data-pagination";
@@ -53,8 +54,7 @@ const Products = () => {
   const { user } = useAuth();
   const storeId = user?.store_id;
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [newProductOpen, setNewProductOpen] = useState(false);
@@ -62,56 +62,56 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
 
-  const fetchProducts = useCallback(async () => {
-    if (!storeId) return;
-    setLoading(true);
-    const { data: prods, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
+  const { data: products = [], isLoading: loading } = useQuery<Product[]>({
+    queryKey: ["products", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data: prods, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("store_id", storeId!)
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      setLoading(false);
-      return;
-    }
+      if (error) {
+        toast({ title: "Erreur", description: error.message, variant: "destructive" });
+        throw error;
+      }
 
-    // Fetch variants for all products
-    const productIds = (prods || []).map((p) => p.id);
-    const { data: variants } = productIds.length > 0
-      ? await supabase.from("product_variants").select("*").in("product_id", productIds)
-      : { data: [] };
+      const productIds = (prods || []).map((p) => p.id);
+      const { data: variants } = productIds.length > 0
+        ? await supabase.from("product_variants").select("*").in("product_id", productIds)
+        : { data: [] };
 
-    const variantMap = new Map<string, ProductVariant[]>();
-    (variants || []).forEach((v) => {
-      const list = variantMap.get(v.product_id) || [];
-      list.push({ id: v.id, label: v.name, stock: v.stock ?? 0 });
-      variantMap.set(v.product_id, list);
-    });
+      const variantMap = new Map<string, ProductVariant[]>();
+      (variants || []).forEach((v) => {
+        const list = variantMap.get(v.product_id) || [];
+        list.push({ id: v.id, label: v.name, stock: v.stock ?? 0 });
+        variantMap.set(v.product_id, list);
+      });
 
-    const mapped: Product[] = (prods || []).map((p) => {
-      const pvs = variantMap.get(p.id) || [];
-      const totalStock = pvs.length > 0 ? pvs.reduce((s, v) => s + v.stock, 0) : (p.stock ?? 0);
-      return {
-        id: p.id,
-        name: p.name,
-        category: p.category || "Autre",
-        price: p.price,
-        stock: totalStock,
-        maxStock: p.stock_alert_threshold ? Math.max(totalStock, p.stock_alert_threshold * 10) : Math.max(totalStock, 100),
-        variants: pvs,
-        image: p.image_url || "📦",
-        status: !p.is_active ? "draft" : totalStock === 0 ? "out_of_stock" : "active",
-        sales: 0, // computed from order_items later
-      };
-    });
+      return (prods || []).map((p) => {
+        const pvs = variantMap.get(p.id) || [];
+        const totalStock = pvs.length > 0 ? pvs.reduce((s, v) => s + v.stock, 0) : (p.stock ?? 0);
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.category || "Autre",
+          price: p.price,
+          stock: totalStock,
+          maxStock: p.stock_alert_threshold ? Math.max(totalStock, p.stock_alert_threshold * 10) : Math.max(totalStock, 100),
+          variants: pvs,
+          image: p.image_url || "📦",
+          status: !p.is_active ? "draft" : totalStock === 0 ? "out_of_stock" : "active",
+          sales: 0,
+        };
+      });
+    },
+  });
 
-    setProducts(mapped);
-    setLoading(false);
-  }, [storeId]);
-
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  const invalidateProducts = () => {
+    queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard", storeId] });
+  };
 
   const handleNewProduct = async (values: NewProductFormValues) => {
     if (!storeId) return;
@@ -147,13 +147,13 @@ const Products = () => {
       );
       if (variantError) {
         toast({ title: "Produit créé, erreur variantes", description: variantError.message, variant: "destructive" });
-        fetchProducts();
+        invalidateProducts();
         return;
       }
     }
 
     toast({ title: "Produit ajouté" });
-    fetchProducts();
+    invalidateProducts();
   };
 
   const handleEditProduct = async (values: EditProductFormValues) => {
@@ -185,14 +185,14 @@ const Products = () => {
       );
       if (variantError) {
         toast({ title: "Produit modifié, erreur variantes", description: variantError.message, variant: "destructive" });
-        fetchProducts();
+        invalidateProducts();
         return;
       }
     }
 
     toast({ title: "Produit modifié" });
     setEditingProduct(null);
-    fetchProducts();
+    invalidateProducts();
   };
 
   const handleDeleteProduct = async () => {
@@ -205,7 +205,7 @@ const Products = () => {
       toast({ title: "Produit supprimé" });
     }
     setDeletingProduct(null);
-    fetchProducts();
+    invalidateProducts();
   };
 
   const categories = [...new Set(products.map((p) => p.category))];

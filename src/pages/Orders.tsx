@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { normalize } from "@/lib/normalize";
 import { usePagination } from "@/hooks/usePagination";
 import { DataPagination } from "@/components/ui/data-pagination";
@@ -71,9 +72,8 @@ function mapToDbStatus(frontStatus: OrderPipelineStatus): string {
 const Orders = () => {
   const { user } = useAuth();
   const storeId = user?.store_id;
+  const queryClient = useQueryClient();
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -83,50 +83,52 @@ const Orders = () => {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
 
-  const fetchOrders = useCallback(async () => {
-    if (!storeId) return;
-    setLoading(true);
+  const { data: orders = [], isLoading: loading } = useQuery<Order[]>({
+    queryKey: ["orders", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const { data: dbOrders, error } = await supabase
+        .from("orders")
+        .select("*, customers(name, phone, email), order_items(*)")
+        .eq("store_id", storeId!)
+        .order("created_at", { ascending: false });
 
-    const { data: dbOrders, error } = await supabase
-      .from("orders")
-      .select("*, customers(name, phone, email), order_items(*)")
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
+      if (error) {
+        toast({ title: "Erreur", description: error.message, variant: "destructive" });
+        throw error;
+      }
 
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      setLoading(false);
-      return;
-    }
+      return (dbOrders || []).map((o) => {
+        const items: OrderItem[] = (o.order_items || []).map((oi: any) => ({
+          name: oi.product_name,
+          qty: oi.quantity,
+          price: oi.unit_price,
+          variant: undefined,
+        }));
+        return {
+          id: o.order_number,
+          dbId: o.id,
+          customer: (o.customers as any)?.name || "Client inconnu",
+          phone: (o.customers as any)?.phone || "",
+          email: (o.customers as any)?.email || "",
+          items,
+          total: o.total_amount,
+          status: mapDbStatus(o.status),
+          paymentStatus: o.payment_status || "pending",
+          date: o.created_at,
+          address: o.shipping_address || "",
+          assignee: undefined,
+        };
+      });
+    },
+  });
 
-    const mapped: Order[] = (dbOrders || []).map((o) => {
-      const items: OrderItem[] = (o.order_items || []).map((oi: any) => ({
-        name: oi.product_name,
-        qty: oi.quantity,
-        price: oi.unit_price,
-        variant: undefined,
-      }));
-      return {
-        id: o.order_number,
-        dbId: o.id,
-        customer: (o.customers as any)?.name || "Client inconnu",
-        phone: (o.customers as any)?.phone || "",
-        email: (o.customers as any)?.email || "",
-        items,
-        total: o.total_amount,
-        status: mapDbStatus(o.status),
-        paymentStatus: o.payment_status || "pending",
-        date: o.created_at,
-        address: o.shipping_address || "",
-        assignee: undefined,
-      };
-    });
-
-    setOrders(mapped);
-    setLoading(false);
-  }, [storeId]);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  const invalidateOrdersAndRelated = () => {
+    queryClient.invalidateQueries({ queryKey: ["orders", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["customers", storeId] });
+  };
 
   const handleNewOrder = async (values: NewOrderFormValues) => {
     if (!storeId || submitting) return;
@@ -202,7 +204,7 @@ const Orders = () => {
 
       toast({ title: "Commande créée" });
       setNewOrderOpen(false);
-      await fetchOrders();
+      invalidateOrdersAndRelated();
     } finally {
       setSubmitting(false);
     }
@@ -248,7 +250,7 @@ const Orders = () => {
 
       toast({ title: "Commande modifiée" });
       setEditingOrder(null);
-      await fetchOrders();
+      invalidateOrdersAndRelated();
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +268,7 @@ const Orders = () => {
         toast({ title: "Commande supprimée" });
       }
       setDeletingOrder(null);
-      await fetchOrders();
+      invalidateOrdersAndRelated();
     } finally {
       setSubmitting(false);
     }
@@ -282,32 +284,41 @@ const Orders = () => {
   const PAGE_SIZE = 20;
   const { page, totalPages, paginated: paginatedOrders, next, prev, goTo, total: filteredTotal } = usePagination(filtered, PAGE_SIZE);
 
+  const optimisticStatusUpdate = (orderId: string, nextStatus: OrderPipelineStatus) => {
+    queryClient.setQueryData<Order[]>(["orders", storeId], (prev = []) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
+    );
+  };
+
   const handleAdvance = useCallback(async (orderId: string, nextStatus: OrderPipelineStatus) => {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
     const previousStatus = order.status;
     const dbStatus = mapToDbStatus(nextStatus);
-    // Optimistic update
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o)));
+    optimisticStatusUpdate(orderId, nextStatus);
     const { error } = await supabase.from("orders").update({ status: dbStatus as any }).eq("id", order.dbId);
     if (error) {
-      // Revert optimistic update
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: previousStatus } : o)));
+      optimisticStatusUpdate(orderId, previousStatus);
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["dashboard", storeId] });
     }
-  }, [orders]);
+  }, [orders, storeId]);
 
   const handleCancel = useCallback(async (orderId: string) => {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
     const previousStatus = order.status;
-    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as OrderPipelineStatus } : o)));
+    optimisticStatusUpdate(orderId, "cancelled" as OrderPipelineStatus);
     const { error } = await supabase.from("orders").update({ status: "cancelled" as any }).eq("id", order.dbId);
     if (error) {
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: previousStatus } : o)));
+      optimisticStatusUpdate(orderId, previousStatus);
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      // Stock was restored by trigger; refresh products + dashboard.
+      invalidateOrdersAndRelated();
     }
-  }, [orders]);
+  }, [orders, storeId]);
 
   const pipelineOrders: PipelineOrder[] = (viewMode === "kanban" ? filtered : paginatedOrders).map((o) => ({
     id: o.id, customer: o.customer, phone: o.phone, address: o.address,

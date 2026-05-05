@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +74,7 @@ const Stock = () => {
   const { user } = useAuth();
   const storeId = user?.store_id;
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [movementType, setMovementType] = useState<"in" | "out" | "adjustment">("in");
 
@@ -85,37 +84,42 @@ const Stock = () => {
     reason: "",
   });
 
-  const fetchData = useCallback(async () => {
-    if (!storeId) return;
-    setLoading(true);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["stock", storeId],
+    enabled: !!storeId,
+    queryFn: async () => {
+      const [{ data: prods }, { data: movs }] = await Promise.all([
+        supabase
+          .from("products")
+          .select("id, name, category, stock, stock_alert_threshold")
+          .eq("store_id", storeId!)
+          .order("name"),
+        supabase
+          .from("stock_movements" as never)
+          .select("*, products(name)")
+          .eq("store_id" as never, storeId as never)
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ]);
 
-    const [{ data: prods }, { data: movs }] = await Promise.all([
-      supabase
-        .from("products")
-        .select("id, name, category, stock, stock_alert_threshold")
-        .eq("store_id", storeId)
-        .order("name"),
-      supabase
-        .from("stock_movements" as never)
-        .select("*, products(name)")
-        .eq("store_id" as never, storeId as never)
-        .order("created_at", { ascending: false })
-        .limit(100),
-    ]);
+      return {
+        products: (prods as unknown as Product[]) || [],
+        movements: ((movs as unknown as (Movement & { products?: { name?: string } })[]) || []).map((m) => ({
+          ...m,
+          product_name: m.products?.name ?? "(produit supprimé)",
+        })),
+      };
+    },
+  });
 
-    setProducts((prods as unknown as Product[]) || []);
-    setMovements(
-      ((movs as unknown as (Movement & { products?: { name?: string } })[]) || []).map((m) => ({
-        ...m,
-        product_name: m.products?.name ?? "(produit supprimé)",
-      }))
-    );
-    setLoading(false);
-  }, [storeId]);
+  const products = data?.products ?? [];
+  const movements = data?.movements ?? [];
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const invalidateStock = () => {
+    queryClient.invalidateQueries({ queryKey: ["stock", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard", storeId] });
+  };
 
   const openMovement = (type: "in" | "out" | "adjustment") => {
     setMovementType(type);
@@ -167,7 +171,7 @@ const Stock = () => {
       description: `${product.name} : ${product.stock} → ${newStock}`,
     });
     setDialogOpen(false);
-    fetchData();
+    invalidateStock();
   };
 
   if (loading) {
