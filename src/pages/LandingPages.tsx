@@ -22,13 +22,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Info, Copy, Check, Loader2, Plus, Pencil, Trash2, ArrowLeft, Lock,
   Globe, Eye, ExternalLink, Sparkles, Code as CodeIcon, FileCode,
-  Layers, BarChart3,
+  Layers, BarChart3, Zap, Timer, MessageSquare, Star,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useModules } from "@/contexts/ModulesContext";
 import { useNavigate } from "react-router-dom";
+import { TUNNEL_PARFAIT_TEMPLATE } from "@/templates/tunnelParfait";
 
 const FREE_PAGES_LIMIT = 1;
 
@@ -385,14 +386,55 @@ function LandingPageEditor({ page, onBack }: { page: LandingPage; onBack: () => 
 
                   {/* HTML MODE */}
                   <TabsContent value="html" className="space-y-3 pt-4">
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex gap-2 text-xs">
-                      <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                    {/* Template starters */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Démarrer avec un template</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Tunnel Parfait */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (htmlContent.trim() && !window.confirm("Remplacer le contenu actuel par le template Tunnel Parfait ?")) return;
+                            setHtmlContent(TUNNEL_PARFAIT_TEMPLATE);
+                          }}
+                          className="group relative rounded-xl border-2 border-dashed border-primary/30 hover:border-primary bg-gradient-to-br from-primary/5 to-purple-500/5 hover:from-primary/10 hover:to-purple-500/10 p-3 text-left transition-all cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6542F0] to-[#AB30E8] flex items-center justify-center mb-2 shadow-md">
+                            <Zap size={15} className="text-white" />
+                          </div>
+                          <p className="text-xs font-bold text-foreground leading-tight">Tunnel Parfait</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">10 sections · Timer · FOMO · Popup</p>
+                          <div className="absolute top-2 right-2">
+                            <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">PRO</span>
+                          </div>
+                        </button>
+                        {/* HTML libre */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (htmlContent.trim() && !window.confirm("Effacer le contenu actuel ?")) return;
+                            setHtmlContent("");
+                          }}
+                          className="group rounded-xl border-2 border-dashed border-border hover:border-muted-foreground/50 bg-muted/30 hover:bg-muted/50 p-3 text-left transition-all cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center mb-2">
+                            <CodeIcon size={15} className="text-muted-foreground" />
+                          </div>
+                          <p className="text-xs font-bold text-foreground leading-tight">HTML libre</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Repartir de zéro</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 flex gap-2 text-xs">
+                      <Info size={14} className="text-accent shrink-0 mt-0.5" />
                       <p className="text-muted-foreground">
-                        Votre HTML sera rendu dans un environnement isolé (sandbox). Les scripts
-                        ne s'exécuteront pas. Le formulaire de commande s'ajoute automatiquement
-                        en bas de page si vous en avez sélectionné un.
+                        HTML complet avec <strong>JavaScript</strong>, CSS et Google Fonts supportés.
+                        Le formulaire de commande s'ajoute automatiquement en bas si vous en avez sélectionné un.
                       </p>
                     </div>
+
                     <Label>Code HTML</Label>
                     <Textarea
                       value={htmlContent}
@@ -534,7 +576,7 @@ export function HtmlPreview({ html, formId }: { html: string; formId: string | n
   return (
     <iframe
       srcDoc={fullHtml}
-      sandbox="allow-forms allow-popups"
+      sandbox="allow-forms allow-popups allow-scripts"
       className="w-full h-full"
       style={{ border: "none" }}
       title="Aperçu HTML"
@@ -552,6 +594,8 @@ const LandingPagesContent = () => {
 
   const [editingPage, setEditingPage] = useState<LandingPage | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"choose" | "name">("choose");
+  const [chosenStarter, setChosenStarter] = useState<"template" | "tunnel" | "html">("template");
   const [newTitle, setNewTitle] = useState("");
   const [deletingPage, setDeletingPage] = useState<LandingPage | null>(null);
 
@@ -577,14 +621,17 @@ const LandingPagesContent = () => {
   const createMutation = useMutation({
     mutationFn: async (title: string) => {
       if (!user?.store_id) throw new Error("No store");
+      const isTunnel = chosenStarter === "tunnel";
+      const isHtml = chosenStarter === "html" || isTunnel;
       const { data, error } = await supabase
         .from("landing_pages" as never)
         .insert({
           store_id: user.store_id,
           title,
           slug: generateUniqueSlug(title),
-          mode: "template",
+          mode: isHtml ? "html" : "template",
           template_data: defaultTemplateData as any,
+          html_content: isTunnel ? TUNNEL_PARFAIT_TEMPLATE : null,
           status: "draft",
         } as never)
         .select("*")
@@ -596,6 +643,7 @@ const LandingPagesContent = () => {
       queryClient.invalidateQueries({ queryKey: ["landing-pages"] });
       setCreateDialogOpen(false);
       setNewTitle("");
+      setCreateStep("choose");
       setEditingPage(created);
       toast({ title: "Landing page créée" });
     },
@@ -630,7 +678,7 @@ const LandingPagesContent = () => {
           size="sm"
           className="gap-2"
           disabled={atLimit}
-          onClick={() => { setNewTitle(""); setCreateDialogOpen(true); }}
+          onClick={() => { setNewTitle(""); setCreateStep("choose"); setChosenStarter("template"); setCreateDialogOpen(true); }}
           title={atLimit ? `Limite gratuite atteinte (${FREE_PAGES_LIMIT} page max)` : undefined}
         >
           {atLimit ? <Lock size={14} /> : <Plus size={14} />}
@@ -638,31 +686,150 @@ const LandingPagesContent = () => {
         </Button>
       }
     >
-      {/* Create dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
+      {/* Create dialog — 2-step */}
+      <Dialog open={createDialogOpen} onOpenChange={(v) => { setCreateDialogOpen(v); if (!v) setCreateStep("choose"); }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nouvelle landing page</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {createStep === "name" && (
+                <button
+                  type="button"
+                  onClick={() => setCreateStep("choose")}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+              )}
+              {createStep === "choose" ? "Choisir un template" : "Nommer la page"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>Titre de la page</Label>
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Ex: Promo Été 2026"
-              onKeyDown={(e) => { if (e.key === "Enter" && newTitle.trim()) createMutation.mutate(newTitle.trim()); }}
-              autoFocus
-            />
-          </div>
+
+          {createStep === "choose" && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">Sélectionnez un point de départ pour votre page.</p>
+              <div className="grid grid-cols-1 gap-3">
+
+                {/* Tunnel Parfait */}
+                <button
+                  type="button"
+                  onClick={() => { setChosenStarter("tunnel"); setCreateStep("name"); }}
+                  className="group relative rounded-2xl border-2 border-primary/30 hover:border-primary bg-gradient-to-br from-[#6542F0]/5 via-[#AB30E8]/5 to-[#17CFAA]/5 hover:from-[#6542F0]/10 hover:via-[#AB30E8]/10 hover:to-[#17CFAA]/10 p-4 text-left transition-all overflow-hidden"
+                >
+                  {/* Decorative gradient blob */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#6542F0]/20 to-[#AB30E8]/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                  <div className="relative flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6542F0] to-[#AB30E8] flex items-center justify-center shrink-0 shadow-lg shadow-primary/30">
+                      <Zap size={18} className="text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-bold text-sm text-foreground">Tunnel Parfait</p>
+                        <span className="text-[10px] font-bold bg-gradient-to-r from-[#6542F0] to-[#AB30E8] text-white px-2 py-0.5 rounded-full">RECOMMANDÉ</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Page haute conversion prête à l'emploi.
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {["10 sections", "Compte à rebours", "Notifications FOMO", "FAQ accordion", "Popup promo"].map((tag) => (
+                          <span key={tag} className="text-[10px] bg-primary/8 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-medium">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="shrink-0 w-6 h-6 rounded-full border-2 border-primary/30 group-hover:border-primary group-hover:bg-primary flex items-center justify-center transition-all">
+                      <Check size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Template simple */}
+                <button
+                  type="button"
+                  onClick={() => { setChosenStarter("template"); setCreateStep("name"); }}
+                  className="group relative rounded-2xl border-2 border-border hover:border-primary/40 bg-card hover:bg-primary/3 p-4 text-left transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                      <Sparkles size={18} className="text-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-foreground mb-0.5">Template visuel</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Configurez titre, image, couleurs et bénéfices via un formulaire. Sans code.
+                      </p>
+                    </div>
+                    <div className="shrink-0 w-6 h-6 rounded-full border-2 border-border group-hover:border-primary/40 transition-all" />
+                  </div>
+                </button>
+
+                {/* HTML libre */}
+                <button
+                  type="button"
+                  onClick={() => { setChosenStarter("html"); setCreateStep("name"); }}
+                  className="group relative rounded-2xl border-2 border-border hover:border-primary/40 bg-card hover:bg-primary/3 p-4 text-left transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                      <CodeIcon size={18} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-foreground mb-0.5">HTML personnalisé</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Copiez-collez votre propre HTML avec JavaScript et styles.
+                      </p>
+                    </div>
+                    <div className="shrink-0 w-6 h-6 rounded-full border-2 border-border group-hover:border-primary/40 transition-all" />
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {createStep === "name" && (
+            <div className="space-y-4 py-2">
+              {/* Chosen starter recap */}
+              <div className={`rounded-xl p-3 flex items-center gap-3 ${chosenStarter === "tunnel" ? "bg-primary/5 border border-primary/20" : "bg-muted/50 border border-border"}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${chosenStarter === "tunnel" ? "bg-gradient-to-br from-[#6542F0] to-[#AB30E8]" : chosenStarter === "template" ? "bg-accent/10" : "bg-muted"}`}>
+                  {chosenStarter === "tunnel" ? <Zap size={14} className="text-white" /> : chosenStarter === "template" ? <Sparkles size={14} className="text-accent" /> : <CodeIcon size={14} className="text-muted-foreground" />}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">
+                    {chosenStarter === "tunnel" ? "Tunnel Parfait" : chosenStarter === "template" ? "Template visuel" : "HTML personnalisé"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {chosenStarter === "tunnel" ? "10 sections · haute conversion" : chosenStarter === "template" ? "Sans code, configurable" : "Page blanche"}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Titre de la page</Label>
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Ex: Promo Été 2026"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newTitle.trim()) createMutation.mutate(newTitle.trim()); }}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">Utilisé comme titre interne et pour l'URL.</p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Annuler</Button>
-            <Button
-              onClick={() => createMutation.mutate(newTitle.trim())}
-              disabled={!newTitle.trim() || createMutation.isPending}
-            >
-              {createMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-              Créer
-            </Button>
+            {createStep === "choose" ? (
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Annuler</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setCreateStep("choose")}>Retour</Button>
+                <Button
+                  onClick={() => createMutation.mutate(newTitle.trim())}
+                  disabled={!newTitle.trim() || createMutation.isPending}
+                  className="gap-2"
+                >
+                  {createMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : null}
+                  Créer la page
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -726,74 +893,133 @@ const LandingPagesContent = () => {
         )}
 
         {!isLoading && pages.length === 0 && (
-          <Card className="border-dashed border-2">
-            <CardContent className="p-12 flex flex-col items-center gap-4 text-center">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                <Layers size={24} className="text-primary" />
+          <Card className="border-dashed border-2 overflow-hidden">
+            <CardContent className="p-0">
+              {/* Decorative top band */}
+              <div className="h-2 bg-gradient-to-r from-[#6542F0] via-[#AB30E8] to-[#17CFAA]" />
+              <div className="p-12 flex flex-col items-center gap-5 text-center">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-purple-500/10 flex items-center justify-center">
+                    <Layers size={28} className="text-primary" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br from-[#6542F0] to-[#AB30E8] flex items-center justify-center">
+                    <Zap size={10} className="text-white" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-bold text-lg">Aucune landing page</p>
+                  <p className="text-muted-foreground text-sm mt-1 max-w-xs">
+                    Créez votre première page en moins de 2 minutes et partagez-la sur Instagram, WhatsApp ou TikTok.
+                  </p>
+                </div>
+                {/* Feature pills */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {["Compte à rebours", "Témoignages", "FAQ", "Popup promo", "Notifications FOMO"].map((f) => (
+                    <span key={f} className="text-xs bg-primary/6 text-primary border border-primary/15 px-2.5 py-1 rounded-full">{f}</span>
+                  ))}
+                </div>
+                <Button
+                  className="gap-2 bg-gradient-to-r from-[#6542F0] to-[#AB30E8] border-0 shadow-lg shadow-primary/25"
+                  onClick={() => { setNewTitle(""); setCreateStep("choose"); setChosenStarter("template"); setCreateDialogOpen(true); }}
+                >
+                  <Plus size={14} /> Créer ma première page
+                </Button>
               </div>
-              <div>
-                <p className="font-semibold text-lg">Aucune landing page</p>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Créez une page pour mettre en avant un produit ou une promo.
-                </p>
-              </div>
-              <Button onClick={() => { setNewTitle(""); setCreateDialogOpen(true); }}>
-                <Plus size={14} className="mr-2" /> Créer ma première page
-              </Button>
             </CardContent>
           </Card>
         )}
 
         {!isLoading && pages.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pages.map((p) => (
-              <Card key={p.id} className="border-border/60 hover:border-primary/40 transition-colors">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{p.title}</p>
-                      <code className="text-xs text-muted-foreground truncate block mt-0.5">/p/{p.slug}</code>
+            {pages.map((p) => {
+              const primary = p.template_data?.primary_color || "#6542F0";
+              const isTunnel = p.mode === "html" && !!p.html_content?.includes("Tunnel Parfait");
+              return (
+                <Card key={p.id} className="border-border/60 hover:border-primary/40 transition-all hover:shadow-md overflow-hidden group">
+                  {/* Visual thumbnail */}
+                  <div
+                    className="h-28 relative overflow-hidden cursor-pointer"
+                    onClick={() => setEditingPage(p)}
+                    style={{
+                      background: isTunnel
+                        ? "linear-gradient(135deg, #6542F0, #AB30E8)"
+                        : `linear-gradient(135deg, ${primary}22, ${primary}08)`,
+                    }}
+                  >
+                    {/* Decorative elements */}
+                    <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+                    <div className="absolute inset-0 flex flex-col justify-between p-3">
+                      <div className="flex items-center justify-between">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold ${isTunnel ? "bg-white/20 text-white" : "bg-white border border-border/50 text-muted-foreground"}`}>
+                          {isTunnel ? <Zap size={10} /> : p.mode === "template" ? <Sparkles size={10} /> : <CodeIcon size={10} />}
+                          {isTunnel ? "Tunnel Parfait" : p.mode === "template" ? "Template" : "HTML libre"}
+                        </div>
+                        <Badge
+                          className={`text-[10px] px-2 py-0.5 ${p.status === "published" ? "bg-accent text-white border-0" : "bg-white/80 text-muted-foreground border border-border/50"}`}
+                        >
+                          {p.status === "published" ? "● Publiée" : "Brouillon"}
+                        </Badge>
+                      </div>
+                      {/* Fake content blocks */}
+                      <div className="space-y-1.5">
+                        <div className={`h-2 rounded-full w-3/4 ${isTunnel ? "bg-white/40" : "bg-current opacity-15"}`} />
+                        <div className={`h-1.5 rounded-full w-1/2 ${isTunnel ? "bg-white/25" : "bg-current opacity-10"}`} />
+                        <div className={`h-5 rounded-full w-28 mt-1 ${isTunnel ? "bg-white/30" : "bg-current opacity-15"}`} />
+                      </div>
                     </div>
-                    <Badge variant={p.status === "published" ? "default" : "secondary"} className="text-xs shrink-0">
-                      {p.status === "published" ? "Publiée" : "Brouillon"}
-                    </Badge>
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="bg-white/90 backdrop-blur-sm text-foreground text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+                        <Pencil size={11} /> Éditer
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <Eye size={12} /> {p.views_count}
+
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate text-sm">{p.title}</p>
+                        <code className="text-[11px] text-muted-foreground truncate block mt-0.5">/p/{p.slug}</code>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <BarChart3 size={12} /> {p.conversions_count} conv.
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                      <div className="flex items-center gap-1">
+                        <Eye size={11} /> {p.views_count}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <BarChart3 size={11} /> {p.conversions_count} conv.
+                      </div>
+                      {p.conversions_count > 0 && p.views_count > 0 && (
+                        <div className="flex items-center gap-1 text-accent font-medium">
+                          <Star size={11} /> {((p.conversions_count / p.views_count) * 100).toFixed(1)}%
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      {p.mode === "template" ? <Sparkles size={12} /> : <CodeIcon size={12} />}
-                      {p.mode === "template" ? "Template" : "HTML"}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => setEditingPage(p)}>
-                      <Pencil size={13} /> Éditer
-                    </Button>
-                    {p.status === "published" && (
-                      <Button variant="outline" size="icon" asChild className="shrink-0">
-                        <a href={`/p/${p.slug}`} target="_blank" rel="noopener noreferrer" title="Ouvrir">
-                          <ExternalLink size={13} />
-                        </a>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs h-8" onClick={() => setEditingPage(p)}>
+                        <Pencil size={12} /> Éditer
                       </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="text-destructive hover:text-destructive shrink-0"
-                      onClick={() => setDeletingPage(p)}
-                      title="Supprimer"
-                    >
-                      <Trash2 size={13} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      {p.status === "published" && (
+                        <Button variant="outline" size="icon" asChild className="shrink-0 h-8 w-8">
+                          <a href={`/p/${p.slug}`} target="_blank" rel="noopener noreferrer" title="Voir la page">
+                            <ExternalLink size={12} />
+                          </a>
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="text-destructive hover:text-destructive shrink-0 h-8 w-8"
+                        onClick={() => setDeletingPage(p)}
+                        title="Supprimer"
+                      >
+                        <Trash2 size={12} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
