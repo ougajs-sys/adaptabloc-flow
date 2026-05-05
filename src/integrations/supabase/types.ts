@@ -710,6 +710,8 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          phone_e164: string | null
+          phone_verified_at: string | null
           store_id: string
           updated_at: string
           user_id: string
@@ -721,6 +723,8 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          phone_e164?: string | null
+          phone_verified_at?: string | null
           store_id: string
           updated_at?: string
           user_id: string
@@ -732,6 +736,8 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          phone_e164?: string | null
+          phone_verified_at?: string | null
           store_id?: string
           updated_at?: string
           user_id?: string
@@ -1090,6 +1096,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          phone_e164: string
+          purpose: string
+          user_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          phone_e164: string
+          purpose?: string
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          phone_e164?: string
+          purpose?: string
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
+      whatsapp_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          ip: string | null
+          phone_e164: string
+          purpose: string
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip?: string | null
+          phone_e164: string
+          purpose?: string
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip?: string | null
+          phone_e164?: string
+          purpose?: string
+          success?: boolean
+        }
+        Relationships: []
       }
     }
     Views: {
