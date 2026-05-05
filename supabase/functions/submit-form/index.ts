@@ -83,18 +83,17 @@ Deno.serve(async (req) => {
     // 2. Extract customer info
     // We try to match standard fields or look for "phone", "email", "name" in keys (case insensitive)
     const findValue = (keys: string[]) => {
-      const key = Object.keys(data).find(k => keys.includes(k.toLowerCase()));
-      return key ? data[key] : undefined;
+      const key = Object.keys(dataObj).find(k => keys.includes(k.toLowerCase()));
+      return key ? dataObj[key] : undefined;
     }
 
-    const phone = findValue(['phone', 'téléphone', 'telephone', 'mobile']);
-    const email = findValue(['email', 'e-mail', 'mail']);
-    const name = findValue(['name', 'nom', 'nom complet', 'fullname']) || 'Client Formulaire';
-    const address = findValue(['address', 'adresse', 'lieu de livraison']) || '';
-    
+    const phone = validatePhone(findValue(['phone', 'téléphone', 'telephone', 'mobile']));
+    const email = validateEmail(findValue(['email', 'e-mail', 'mail']));
+    const name = clean(findValue(['name', 'nom', 'nom complet', 'fullname']), 150) || 'Client Formulaire';
+    const address = clean(findValue(['address', 'adresse', 'lieu de livraison']), 500) || '';
+
     let customerId: string | undefined;
 
-    // Search existing customer
     if (phone) {
       const { data: existing } = await supabaseClient
         .from('customers')
@@ -115,7 +114,6 @@ Deno.serve(async (req) => {
       if (existing) customerId = existing.id
     }
 
-    // Create customer if needed
     if (!customerId) {
       const { data: newCustomer, error: createError } = await supabaseClient
         .from('customers')
@@ -130,7 +128,7 @@ Deno.serve(async (req) => {
         })
         .select('id')
         .single()
-      
+
       if (createError) {
         console.error('Customer creation failed:', createError)
         throw new Error('Failed to create customer profile')
@@ -139,10 +137,10 @@ Deno.serve(async (req) => {
     }
 
     // 3. Create Order
-    // Try to find product info
-    const productValue = findValue(['product', 'produit', 'article']);
-    const quantityValue = findValue(['quantity', 'quantité', 'qte']) || 1;
-    const quantity = parseInt(String(quantityValue)) || 1;
+    const productValue = clean(findValue(['product', 'produit', 'article']), 200);
+    const quantityRaw = findValue(['quantity', 'quantité', 'qte']);
+    const quantityNum = parseInt(String(quantityRaw ?? 1));
+    const quantity = Number.isFinite(quantityNum) && quantityNum >= 1 && quantityNum <= 1000 ? quantityNum : 1;
 
     // Order number
     const orderNumber = `CMD-${Date.now().toString().slice(-6)}`
