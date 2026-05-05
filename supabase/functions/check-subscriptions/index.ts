@@ -1,8 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// This function checks for expired subscriptions and deactivates modules
-// It should be called via a cron job daily
-
+// Internal cron endpoint. Requires Bearer CRON_SECRET to call.
 Deno.serve(async (req) => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -14,6 +12,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -21,7 +28,6 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // 1. Find subscriptions past grace period → deactivate
     const { data: expiredSubs } = await supabaseAdmin
       .from("subscriptions")
       .select("*")
@@ -30,9 +36,6 @@ Deno.serve(async (req) => {
 
     if (expiredSubs && expiredSubs.length > 0) {
       for (const sub of expiredSubs) {
-        // Deactivate ONLY the modules tied to this subscription.
-        // The subscription's `modules` array is preserved as a record
-        // for re-activation if the user renews.
         const subModules = (sub.modules as string[]) || [];
         if (subModules.length > 0) {
           await supabaseAdmin
@@ -41,8 +44,6 @@ Deno.serve(async (req) => {
             .eq("store_id", sub.store_id)
             .in("module_id", subModules);
         }
-
-        // Mark subscription as expired
         await supabaseAdmin
           .from("subscriptions")
           .update({ status: "expired" })
@@ -50,28 +51,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Find subscriptions due for renewal (renewal_date <= now, status = active)
     const { data: dueSubs } = await supabaseAdmin
       .from("subscriptions")
       .select("*")
       .eq("status", "active")
       .lt("renewal_date", now);
 
-    // For each due subscription, we would trigger a payment via the provider
-    // For now, just log them. Real implementation would call provider APIs.
-    const dueCount = dueSubs?.length || 0;
-
     return new Response(
       JSON.stringify({
         expired_deactivated: expiredSubs?.length || 0,
-        renewals_due: dueCount,
+        renewals_due: dueSubs?.length || 0,
         checked_at: now,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
+  } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: (err as Error).message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
