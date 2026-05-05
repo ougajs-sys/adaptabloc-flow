@@ -17,11 +17,47 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { formId, data } = await req.json()
-
-    if (!formId) {
-      throw new Error('Form ID is required')
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
+    const { formId, data } = body as { formId?: unknown; data?: unknown }
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (typeof formId !== 'string' || !UUID_RE.test(formId)) {
+      return new Response(JSON.stringify({ error: 'Invalid formId' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return new Response(JSON.stringify({ error: 'Invalid data payload' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    const dataObj = data as Record<string, unknown>
+    if (Object.keys(dataObj).length > 50) {
+      return new Response(JSON.stringify({ error: 'Too many fields' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    const clean = (v: unknown, max: number) => {
+      if (v === undefined || v === null) return undefined
+      const s = String(v).trim().slice(0, max)
+      return s.length ? s : undefined
+    }
+    const validatePhone = (v: unknown) => {
+      const s = clean(v, 30)
+      if (!s) return undefined
+      const digits = s.replace(/[^0-9+]/g, '')
+      return digits.length >= 6 && digits.length <= 20 ? digits : undefined
+    }
+    const validateEmail = (v: unknown) => {
+      const s = clean(v, 255)
+      if (!s) return undefined
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s.toLowerCase() : undefined
+    }
+    const sanitizeLike = (s: string) => s.replace(/[%_\\]/g, '\\$&').slice(0, 100)
 
     // 1. Fetch form
     const { data: form, error: formError } = await supabaseClient
