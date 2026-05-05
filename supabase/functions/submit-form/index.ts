@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         .from('products')
         .select('id, name, price')
         .eq('store_id', form.store_id)
-        .ilike('name', `%${productValue}%`)
+        .ilike('name', `%${sanitizeLike(productValue)}%`)
         .limit(1)
 
       const product = products?.[0];
