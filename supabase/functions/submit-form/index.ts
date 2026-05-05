@@ -17,11 +17,47 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { formId, data } = await req.json()
-
-    if (!formId) {
-      throw new Error('Form ID is required')
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
+    const { formId, data } = body as { formId?: unknown; data?: unknown }
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (typeof formId !== 'string' || !UUID_RE.test(formId)) {
+      return new Response(JSON.stringify({ error: 'Invalid formId' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return new Response(JSON.stringify({ error: 'Invalid data payload' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    const dataObj = data as Record<string, unknown>
+    if (Object.keys(dataObj).length > 50) {
+      return new Response(JSON.stringify({ error: 'Too many fields' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    const clean = (v: unknown, max: number) => {
+      if (v === undefined || v === null) return undefined
+      const s = String(v).trim().slice(0, max)
+      return s.length ? s : undefined
+    }
+    const validatePhone = (v: unknown) => {
+      const s = clean(v, 30)
+      if (!s) return undefined
+      const digits = s.replace(/[^0-9+]/g, '')
+      return digits.length >= 6 && digits.length <= 20 ? digits : undefined
+    }
+    const validateEmail = (v: unknown) => {
+      const s = clean(v, 255)
+      if (!s) return undefined
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s.toLowerCase() : undefined
+    }
+    const sanitizeLike = (s: string) => s.replace(/[%_\\]/g, '\\$&').slice(0, 100)
 
     // 1. Fetch form
     const { data: form, error: formError } = await supabaseClient
@@ -47,18 +83,17 @@ Deno.serve(async (req) => {
     // 2. Extract customer info
     // We try to match standard fields or look for "phone", "email", "name" in keys (case insensitive)
     const findValue = (keys: string[]) => {
-      const key = Object.keys(data).find(k => keys.includes(k.toLowerCase()));
-      return key ? data[key] : undefined;
+      const key = Object.keys(dataObj).find(k => keys.includes(k.toLowerCase()));
+      return key ? dataObj[key] : undefined;
     }
 
-    const phone = findValue(['phone', 'téléphone', 'telephone', 'mobile']);
-    const email = findValue(['email', 'e-mail', 'mail']);
-    const name = findValue(['name', 'nom', 'nom complet', 'fullname']) || 'Client Formulaire';
-    const address = findValue(['address', 'adresse', 'lieu de livraison']) || '';
-    
+    const phone = validatePhone(findValue(['phone', 'téléphone', 'telephone', 'mobile']));
+    const email = validateEmail(findValue(['email', 'e-mail', 'mail']));
+    const name = clean(findValue(['name', 'nom', 'nom complet', 'fullname']), 150) || 'Client Formulaire';
+    const address = clean(findValue(['address', 'adresse', 'lieu de livraison']), 500) || '';
+
     let customerId: string | undefined;
 
-    // Search existing customer
     if (phone) {
       const { data: existing } = await supabaseClient
         .from('customers')
@@ -79,7 +114,6 @@ Deno.serve(async (req) => {
       if (existing) customerId = existing.id
     }
 
-    // Create customer if needed
     if (!customerId) {
       const { data: newCustomer, error: createError } = await supabaseClient
         .from('customers')
@@ -94,7 +128,7 @@ Deno.serve(async (req) => {
         })
         .select('id')
         .single()
-      
+
       if (createError) {
         console.error('Customer creation failed:', createError)
         throw new Error('Failed to create customer profile')
@@ -103,10 +137,10 @@ Deno.serve(async (req) => {
     }
 
     // 3. Create Order
-    // Try to find product info
-    const productValue = findValue(['product', 'produit', 'article']);
-    const quantityValue = findValue(['quantity', 'quantité', 'qte']) || 1;
-    const quantity = parseInt(String(quantityValue)) || 1;
+    const productValue = clean(findValue(['product', 'produit', 'article']), 200);
+    const quantityRaw = findValue(['quantity', 'quantité', 'qte']);
+    const quantityNum = parseInt(String(quantityRaw ?? 1));
+    const quantity = Number.isFinite(quantityNum) && quantityNum >= 1 && quantityNum <= 1000 ? quantityNum : 1;
 
     // Order number
     const orderNumber = `CMD-${Date.now().toString().slice(-6)}`
@@ -138,7 +172,7 @@ Deno.serve(async (req) => {
         .from('products')
         .select('id, name, price')
         .eq('store_id', form.store_id)
-        .ilike('name', `%${productValue}%`)
+        .ilike('name', `%${sanitizeLike(productValue)}%`)
         .limit(1)
 
       const product = products?.[0];
