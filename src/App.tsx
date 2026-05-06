@@ -36,6 +36,8 @@ import Templates from "./pages/Templates";
 import CustomStatuses from "./pages/CustomStatuses";
 import CallScripts from "./pages/CallScripts";
 import CallerStats from "./pages/CallerStats";
+import WarehousePosts from "./pages/WarehousePosts";
+import WarehouseStats from "./pages/WarehouseStats";
 import Segments from "./pages/Segments";
 import Stock from "./pages/Stock";
 import TrackOrder from "./pages/TrackOrder";
@@ -147,6 +149,8 @@ const AppRoutes = () => (
     <Route path="/dashboard/statuses" element={<ProtectedRoute allowedRoles={["admin"]}><CustomStatuses /></ProtectedRoute>} />
     <Route path="/dashboard/call-scripts" element={<ProtectedRoute allowedRoles={["admin"]}><CallScripts /></ProtectedRoute>} />
     <Route path="/dashboard/caller-stats" element={<ProtectedRoute allowedRoles={["admin"]}><CallerStats /></ProtectedRoute>} />
+    <Route path="/dashboard/warehouse-posts" element={<ProtectedRoute allowedRoles={["admin"]}><WarehousePosts /></ProtectedRoute>} />
+    <Route path="/dashboard/warehouse-stats" element={<ProtectedRoute allowedRoles={["admin"]}><WarehouseStats /></ProtectedRoute>} />
     <Route path="/dashboard/segments" element={<ProtectedRoute allowedRoles={["admin"]}><Segments /></ProtectedRoute>} />
     <Route path="/dashboard/stock" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><Stock /></ProtectedRoute>} />
     <Route path="/track/:token" element={<TrackOrder />} />
