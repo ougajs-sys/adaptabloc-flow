@@ -339,9 +339,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Store,
     tier: "tier3",
     price: 15000,
+    routes: ["/dashboard/multi-store"],
     features: ["store_management", "store_analytics", "store_switch"],
     category: "Principal",
-    available: false,
+    available: true,
   },
   {
     id: "ai_assistant",
