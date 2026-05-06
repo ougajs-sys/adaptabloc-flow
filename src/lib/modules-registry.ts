@@ -292,9 +292,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Award,
     tier: "tier2",
     price: 6000,
+    routes: ["/dashboard/loyalty"],
     features: ["loyalty_points", "loyalty_rewards", "loyalty_tiers"],
     category: "Clients",
-    available: false,
+    available: true,
   },
 
   // === TIER 3 ===
