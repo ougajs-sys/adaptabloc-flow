@@ -1105,8 +1105,10 @@ export type Database = {
           email: string | null
           expires_at: string
           id: string
+          name: string | null
           phone_e164: string
           purpose: string
+          signup_payload: Json | null
           user_id: string | null
           verified_at: string | null
         }
@@ -1117,8 +1119,10 @@ export type Database = {
           email?: string | null
           expires_at: string
           id?: string
+          name?: string | null
           phone_e164: string
           purpose?: string
+          signup_payload?: Json | null
           user_id?: string | null
           verified_at?: string | null
         }
@@ -1129,8 +1133,10 @@ export type Database = {
           email?: string | null
           expires_at?: string
           id?: string
+          name?: string | null
           phone_e164?: string
           purpose?: string
+          signup_payload?: Json | null
           user_id?: string | null
           verified_at?: string | null
         }
