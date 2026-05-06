@@ -26,8 +26,11 @@ const Login = () => {
   // Signup state
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
+  const [signupSent, setSignupSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
