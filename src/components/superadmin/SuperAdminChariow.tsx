@@ -43,7 +43,7 @@ export default function SuperAdminChariow() {
   const { data: mappings = [] } = useQuery({
     queryKey: ["chariow-mappings"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("chariow_product_mapping") as any)
+      const { data, error } = await (supabase.from("chariow_product_mapping" as any) as any)
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -54,7 +54,7 @@ export default function SuperAdminChariow() {
   const { data: events = [] } = useQuery({
     queryKey: ["chariow-events"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("chariow_webhook_events") as any)
+      const { data, error } = await (supabase.from("chariow_webhook_events" as any) as any)
         .select("id, event_id, event_type, signature_valid, processed_at, error, received_at")
         .order("received_at", { ascending: false })
         .limit(20);
@@ -75,8 +75,8 @@ export default function SuperAdminChariow() {
         is_active: m.is_active ?? true,
       };
       const query = m.id
-        ? (supabase.from("chariow_product_mapping") as any).update(payload).eq("id", m.id)
-        : (supabase.from("chariow_product_mapping") as any).insert(payload);
+        ? (supabase.from("chariow_product_mapping" as any) as any).update(payload).eq("id", m.id)
+        : (supabase.from("chariow_product_mapping" as any) as any).insert(payload);
       const { error } = await query;
       if (error) throw error;
     },
@@ -90,7 +90,7 @@ export default function SuperAdminChariow() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("chariow_product_mapping") as any).delete().eq("id", id);
+      const { error } = await (supabase.from("chariow_product_mapping" as any) as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
