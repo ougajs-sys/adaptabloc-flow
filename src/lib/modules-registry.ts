@@ -328,9 +328,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Code,
     tier: "tier3",
     price: 10000,
+    routes: ["/dashboard/api"],
     features: ["api_rest", "webhooks", "api_docs"],
     category: "Outils",
-    available: false,
+    available: true,
   },
   {
     id: "multi_store",

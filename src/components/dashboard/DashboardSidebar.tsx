@@ -25,6 +25,7 @@ import {
   Layers,
   Award,
   Store,
+  Code,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -80,6 +81,7 @@ const toolItems: SidebarItem[] = [
   { title: "Stats préparateurs", url: "/dashboard/warehouse-stats", icon: PackageCheck, requiredModule: "warehouse_team", requiredRoles: ["admin"] },
   { title: "Fidélité", url: "/dashboard/loyalty", icon: Award, requiredModule: "loyalty", requiredRoles: ["admin"] },
   { title: "Mes boutiques", url: "/dashboard/multi-store", icon: Store, requiredModule: "multi_store", requiredRoles: ["admin"] },
+  { title: "API & Webhooks", url: "/dashboard/api", icon: Code, requiredModule: "api", requiredRoles: ["admin"] },
   { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
   { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredRoles: ["admin"] },
   { title: "Landing Pages", url: "/dashboard/landing-pages", icon: Layers, requiredModule: "landing_pages", requiredRoles: ["admin"] },
