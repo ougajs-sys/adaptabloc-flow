@@ -51,9 +51,14 @@ export function getProvidersForCountry(countryCode: string): string[] {
   const upper = countryCode.toUpperCase();
   const providers: string[] = [];
 
-  // Moneroo (Chariow): 15+ African countries — preferred provider
+  // Moneroo: 15+ African countries — preferred provider
   if (["BJ","CI","SN","CM","BF","TG","ML","NE","GN","GW","GH","NG","RW","UG","TZ","KE","CD"].includes(upper)) {
     providers.push("moneroo");
+  }
+
+  // Chariow: same African coverage as Moneroo, license-based
+  if (["BJ","CI","SN","CM","BF","TG","ML","NE","GN","GW","GH","NG","RW","UG","TZ","KE","CD"].includes(upper)) {
+    providers.push("chariow");
   }
 
   // CinetPay: Francophone Africa

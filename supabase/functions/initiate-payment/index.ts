@@ -220,6 +220,126 @@ async function initiatePayDunya(
   };
 }
 
+// ─── Chariow ────────────────────────────────────────────────────────────────
+// Sells a license that grants access to the chosen modules. The webhook
+// (sale.completed) returns the license_key which we persist on the subscription.
+
+async function initiateChariow(
+  supabaseAdmin: any,
+  store_id: string,
+  modules: string[],
+  totalXOF: number,
+  totalConverted: number,
+  feeAmount: number,
+  netAmount: number,
+  currency: string,
+  country: string | null,
+  userEmail: string,
+  userName: string,
+) {
+  const CHARIOW_SECRET_KEY = Deno.env.get("CHARIOW_SECRET_KEY");
+  if (!CHARIOW_SECRET_KEY) throw new Error("CHARIOW_SECRET_KEY not configured");
+
+  // Resolve which Chariow product matches the requested module bundle.
+  // Strategy: prefer an exact bundle key match ("bundle:<sorted-modules-joined>"),
+  // fall back to the single-module key, then to the first active mapping that covers all modules.
+  const sortedModules = [...modules].sort();
+  const bundleKey = sortedModules.length === 1
+    ? `single:${sortedModules[0]}`
+    : `bundle:${sortedModules.join(",")}`;
+
+  const { data: mappings } = await supabaseAdmin
+    .from("chariow_product_mapping")
+    .select("*")
+    .eq("is_active", true);
+
+  const exact = (mappings || []).find((m: any) => m.bundle_key === bundleKey);
+  const fallback = (mappings || []).find((m: any) =>
+    Array.isArray(m.modules) && sortedModules.every((id) => m.modules.includes(id))
+  );
+  const mapping = exact || fallback;
+  if (!mapping) {
+    throw new Error(
+      "No Chariow product is configured for the selected modules. " +
+      "Ask a superadmin to add a mapping in chariow_product_mapping.",
+    );
+  }
+
+  const { data: txn, error: txnErr } = await supabaseAdmin
+    .from("transactions")
+    .insert({
+      store_id,
+      gross_amount: Math.round(totalConverted),
+      net_amount: Math.round(netAmount),
+      fee_amount: Math.round(feeAmount),
+      currency: currency || "XOF",
+      provider: "chariow",
+      country: country || null,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (txnErr) throw txnErr;
+
+  const frontendUrl = getFrontendUrl();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const nameParts = userName.trim().split(" ");
+  const firstName = nameParts[0] || "Client";
+  const lastName = nameParts.slice(1).join(" ") || firstName;
+
+  const payload: Record<string, unknown> = {
+    product_id: mapping.chariow_product_id,
+    email: userEmail,
+    first_name: firstName,
+    last_name: lastName,
+    return_url: `${frontendUrl}/dashboard/billing?provider=chariow`,
+    webhook_url: `${supabaseUrl}/functions/v1/payment-webhook`,
+    metadata: {
+      store_id,
+      transaction_id: txn.id,
+      modules: JSON.stringify(modules),
+      bundle_key: mapping.bundle_key,
+      currency,
+      country: country || "",
+    },
+  };
+
+  const res = await fetch("https://api.chariow.com/v1/checkout", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Authorization": `Bearer ${CHARIOW_SECRET_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    await supabaseAdmin.from("transactions").update({ status: "failed" }).eq("id", txn.id);
+    throw new Error(data?.message || data?.error || `Chariow error ${res.status}`);
+  }
+
+  const checkoutUrl = data?.checkout_url || data?.payment_url || data?.url || data?.data?.checkout_url;
+  const checkoutId = data?.id || data?.checkout_id || data?.data?.id;
+  if (!checkoutUrl) {
+    await supabaseAdmin.from("transactions").update({ status: "failed" }).eq("id", txn.id);
+    throw new Error("Chariow did not return a checkout URL");
+  }
+
+  await supabaseAdmin
+    .from("transactions")
+    .update({ provider_reference: checkoutId || checkoutUrl })
+    .eq("id", txn.id);
+
+  return {
+    payment_url: checkoutUrl,
+    transaction_id: txn.id,
+    chariow_id: checkoutId,
+    chariow_product_id: mapping.chariow_product_id,
+  };
+}
+
 // ─── Subscription helpers ────────────────────────────────────────────────────
 
 async function activateSubscription(
@@ -383,6 +503,19 @@ Deno.serve(async (req) => {
     // ── Moneroo ──
     if (provider === "moneroo") {
       const result = await initiateMoneroo(
+        supabaseAdmin, store_id, modules,
+        totalXOF, totalConverted, feeAmount, netAmount,
+        currency || "XOF", country || null,
+        userEmail, userName,
+      );
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Chariow ──
+    if (provider === "chariow") {
+      const result = await initiateChariow(
         supabaseAdmin, store_id, modules,
         totalXOF, totalConverted, feeAmount, netAmount,
         currency || "XOF", country || null,
