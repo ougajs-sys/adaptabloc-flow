@@ -62,17 +62,52 @@ const Login = () => {
       toast({ title: "Le mot de passe doit faire au moins 6 caractères", variant: "destructive" });
       return;
     }
+    if (!/^\+[1-9]\d{7,14}$/.test(signupPhone)) {
+      toast({ title: "Numéro WhatsApp invalide", description: "Format international requis (ex: +221771234567)", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
-      await signUp(signupEmail, signupPassword, signupName);
-      toast({ title: "Compte créé !", description: "Bienvenue sur Intramate." });
-      navigate("/onboarding");
-    } catch (err: any) {
-      toast({
-        title: "Erreur d'inscription",
-        description: err.message,
-        variant: "destructive",
+      const { data, error } = await supabase.functions.invoke("whatsapp-send-magic-link", {
+        body: { phone: signupPhone, email: signupEmail, name: signupName, password: signupPassword },
       });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setSignupSent(true);
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((c) => {
+          if (c <= 1) { clearInterval(interval); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+      toast({ title: "Lien envoyé !", description: "Vérifie WhatsApp pour activer ton compte." });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-send-magic-link", {
+        body: { phone: signupPhone, email: signupEmail, name: signupName, password: signupPassword },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((c) => {
+          if (c <= 1) { clearInterval(interval); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+      toast({ title: "Lien renvoyé sur WhatsApp" });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
