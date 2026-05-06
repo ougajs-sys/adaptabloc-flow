@@ -40,6 +40,7 @@ import WarehousePosts from "./pages/WarehousePosts";
 import WarehouseStats from "./pages/WarehouseStats";
 import LoyaltyProgram from "./pages/LoyaltyProgram";
 import MultiStoreOverview from "./pages/MultiStoreOverview";
+import ApiManager from "./pages/ApiManager";
 import Segments from "./pages/Segments";
 import Stock from "./pages/Stock";
 import TrackOrder from "./pages/TrackOrder";
@@ -155,6 +156,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/warehouse-stats" element={<ProtectedRoute allowedRoles={["admin"]}><WarehouseStats /></ProtectedRoute>} />
     <Route path="/dashboard/loyalty" element={<ProtectedRoute allowedRoles={["admin"]}><LoyaltyProgram /></ProtectedRoute>} />
     <Route path="/dashboard/multi-store" element={<ProtectedRoute allowedRoles={["admin"]}><MultiStoreOverview /></ProtectedRoute>} />
+    <Route path="/dashboard/api" element={<ProtectedRoute allowedRoles={["admin"]}><ApiManager /></ProtectedRoute>} />
     <Route path="/dashboard/segments" element={<ProtectedRoute allowedRoles={["admin"]}><Segments /></ProtectedRoute>} />
     <Route path="/dashboard/stock" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><Stock /></ProtectedRoute>} />
     <Route path="/track/:token" element={<TrackOrder />} />
