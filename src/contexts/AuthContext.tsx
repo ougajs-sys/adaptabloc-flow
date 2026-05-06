@@ -30,15 +30,27 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 async function buildAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
-  // Check if user has a store (via user_roles)
+  // Check if user has a store (via user_roles). Fetch all admin roles so we
+  // can honour a stored multi-store preference if one exists.
   const { data: roles } = await supabase
     .from("user_roles")
     .select("store_id, role")
-    .eq("user_id", supabaseUser.id)
-    .limit(1);
+    .eq("user_id", supabaseUser.id);
 
-  const storeId = roles && roles.length > 0 ? roles[0].store_id : null;
-  const role = roles && roles.length > 0 ? roles[0].role : null;
+  // Honour multi-store preference (set by switch_active_store RPC)
+  const { data: pref } = await (supabase.from("user_store_preferences" as any) as any)
+    .select("preferred_store_id")
+    .eq("user_id", supabaseUser.id)
+    .maybeSingle();
+
+  const preferredId = pref?.preferred_store_id;
+  const preferredRole = preferredId
+    ? (roles || []).find((r: any) => r.store_id === preferredId)
+    : null;
+
+  const activeRole = preferredRole ?? (roles && roles.length > 0 ? roles[0] : null);
+  const storeId = activeRole ? activeRole.store_id : null;
+  const role = activeRole ? activeRole.role : null;
 
   // Check profile
   let name = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "User";
