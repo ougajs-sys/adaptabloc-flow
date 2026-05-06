@@ -73,6 +73,34 @@ Deno.serve(async (req) => {
       return await handlePayDunyaIPN(body, supabaseAdmin);
     }
 
+    // ── Chariow webhook ──
+    // Chariow sends: { id, event, data: { ... }, created_at }
+    // Signature header: x-chariow-signature = HMAC-SHA256(CHARIOW_WEBHOOK_SECRET, rawBody)
+    if (body.event && (body.data || body.payload)) {
+      const webhookSecret = Deno.env.get("CHARIOW_WEBHOOK_SECRET");
+      let signatureValid = !webhookSecret; // if no secret configured, treat as not-checked (true for processing)
+      if (webhookSecret) {
+        const receivedSig = req.headers.get("x-chariow-signature") ||
+          req.headers.get("chariow-signature") || "";
+        const expectedSig = await computeHmacSha256(webhookSecret, rawBody);
+        signatureValid = secureCompare(receivedSig, expectedSig);
+        if (!signatureValid) {
+          // Log the event but reject
+          await supabaseAdmin.from("chariow_webhook_events").insert({
+            event_id: String(body.id || crypto.randomUUID()),
+            event_type: String(body.event),
+            payload: body,
+            signature_valid: false,
+            error: "Invalid signature",
+          }).select().maybeSingle();
+          return new Response(JSON.stringify({ error: "Invalid signature" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+      return await handleChariowWebhook(body, supabaseAdmin, signatureValid);
+    }
+
     // ── Generic legacy webhook ──
     const { event, transaction_id, status, store_id } = body;
 
@@ -419,4 +447,219 @@ async function handlePayDunyaIPN(body: any, supabaseAdmin: any) {
     JSON.stringify({ received: true, status: "activated" }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
+}
+
+// ─── Chariow webhook handler ─────────────────────────────────────────────────
+// Handles sale.completed (license issuance) and license.* events.
+// Persists every event for idempotency (event_id is UNIQUE) and debugging.
+
+async function handleChariowWebhook(body: any, supabaseAdmin: any, signatureValid: boolean) {
+  const eventId = String(body.id || body.event_id || crypto.randomUUID());
+  const eventType = String(body.event || body.type || "unknown");
+  const data = body.data || body.payload || {};
+
+  const { error: insertErr } = await supabaseAdmin
+    .from("chariow_webhook_events")
+    .insert({
+      event_id: eventId,
+      event_type: eventType,
+      payload: body,
+      signature_valid: signatureValid,
+    });
+
+  if (insertErr && insertErr.code === "23505") {
+    return new Response(
+      JSON.stringify({ received: true, status: "duplicate" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  try {
+    if (eventType === "sale.completed" || eventType === "checkout.completed") {
+      await processChariowSale(data, supabaseAdmin);
+    } else if (eventType === "sale.failed" || eventType === "checkout.failed") {
+      await processChariowFailure(data, supabaseAdmin);
+    } else if (eventType === "license.activated" || eventType === "license.renewed") {
+      await processChariowLicenseRenewal(data, supabaseAdmin);
+    } else if (eventType === "license.revoked" || eventType === "subscription.cancelled") {
+      await processChariowLicenseRevocation(data, supabaseAdmin);
+    }
+
+    await supabaseAdmin
+      .from("chariow_webhook_events")
+      .update({ processed_at: new Date().toISOString() })
+      .eq("event_id", eventId);
+  } catch (err: any) {
+    await supabaseAdmin
+      .from("chariow_webhook_events")
+      .update({ error: err?.message || String(err) })
+      .eq("event_id", eventId);
+    throw err;
+  }
+
+  return new Response(
+    JSON.stringify({ received: true, status: "processed", event: eventType }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+async function processChariowSale(data: any, supabaseAdmin: any) {
+  const metadata = data.metadata || {};
+  const store_id = metadata.store_id;
+  const transaction_id = metadata.transaction_id;
+  const modulesRaw = metadata.modules;
+  const currency = metadata.currency || "XOF";
+  const country = metadata.country || null;
+  const licenseKey = data.license_key || data.license?.key || null;
+  const productId = data.product_id || data.product?.id || null;
+
+  if (!store_id || !transaction_id) {
+    throw new Error("Chariow sale missing store_id/transaction_id metadata");
+  }
+
+  const { data: existingTxn } = await supabaseAdmin
+    .from("transactions")
+    .select("status")
+    .eq("id", transaction_id)
+    .maybeSingle();
+  if (existingTxn?.status === "completed") return;
+
+  const modules: string[] = modulesRaw ? JSON.parse(modulesRaw) : [];
+  const now = new Date();
+  const renewalDate = new Date(now);
+  renewalDate.setMonth(renewalDate.getMonth() + 1);
+
+  await supabaseAdmin
+    .from("transactions")
+    .update({ status: "completed" })
+    .eq("id", transaction_id);
+
+  const { data: txn } = await supabaseAdmin
+    .from("transactions")
+    .select("gross_amount")
+    .eq("id", transaction_id)
+    .single();
+  const totalAmount = txn?.gross_amount || 0;
+
+  const { data: subscription, error: subError } = await supabaseAdmin
+    .from("subscriptions")
+    .upsert({
+      store_id,
+      modules,
+      amount: totalAmount,
+      currency,
+      provider: "chariow",
+      country,
+      status: "active",
+      started_at: now.toISOString(),
+      renewal_date: renewalDate.toISOString(),
+      chariow_license_key: licenseKey,
+      chariow_product_id: productId,
+      chariow_activated_at: now.toISOString(),
+      chariow_last_validated_at: now.toISOString(),
+    }, { onConflict: "store_id" })
+    .select()
+    .single();
+
+  if (subError) {
+    await supabaseAdmin.from("subscriptions").insert({
+      store_id, modules, amount: totalAmount, currency,
+      provider: "chariow", country, status: "active",
+      started_at: now.toISOString(), renewal_date: renewalDate.toISOString(),
+      chariow_license_key: licenseKey,
+      chariow_product_id: productId,
+      chariow_activated_at: now.toISOString(),
+      chariow_last_validated_at: now.toISOString(),
+    });
+  }
+
+  if (subscription?.id) {
+    await supabaseAdmin
+      .from("transactions")
+      .update({ subscription_id: subscription.id })
+      .eq("id", transaction_id);
+  }
+
+  await supabaseAdmin.from("store_modules").delete().eq("store_id", store_id);
+  if (modules.length > 0) {
+    await supabaseAdmin.from("store_modules").insert(
+      modules.map((module_id: string) => ({ store_id, module_id }))
+    );
+  }
+
+  const invoiceNumber = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${store_id.slice(0, 4).toUpperCase()}-${transaction_id.slice(-6).toUpperCase()}`;
+  await supabaseAdmin.from("invoices").insert({
+    store_id,
+    invoice_number: invoiceNumber,
+    amount: totalAmount,
+    modules,
+    status: "paid",
+    issued_at: now.toISOString(),
+    paid_at: now.toISOString(),
+    period_start: now.toISOString().split("T")[0],
+    period_end: renewalDate.toISOString().split("T")[0],
+  });
+}
+
+async function processChariowFailure(data: any, supabaseAdmin: any) {
+  const metadata = data.metadata || {};
+  const store_id = metadata.store_id;
+  const transaction_id = metadata.transaction_id;
+  if (!transaction_id) return;
+
+  await supabaseAdmin
+    .from("transactions")
+    .update({ status: "failed" })
+    .eq("id", transaction_id);
+
+  if (store_id) {
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id")
+      .eq("store_id", store_id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (sub) {
+      const graceUntil = new Date();
+      graceUntil.setDate(graceUntil.getDate() + 3);
+      await supabaseAdmin.from("subscriptions").update({
+        status: "grace",
+        grace_until: graceUntil.toISOString(),
+      }).eq("id", sub.id);
+    }
+  }
+}
+
+async function processChariowLicenseRenewal(data: any, supabaseAdmin: any) {
+  const licenseKey = data.license_key || data.license?.key || data.key;
+  if (!licenseKey) return;
+  const now = new Date();
+  const renewalDate = new Date(now);
+  renewalDate.setMonth(renewalDate.getMonth() + 1);
+  await supabaseAdmin
+    .from("subscriptions")
+    .update({
+      status: "active",
+      grace_until: null,
+      renewal_date: renewalDate.toISOString(),
+      chariow_last_validated_at: now.toISOString(),
+    })
+    .eq("chariow_license_key", licenseKey);
+}
+
+async function processChariowLicenseRevocation(data: any, supabaseAdmin: any) {
+  const licenseKey = data.license_key || data.license?.key || data.key;
+  if (!licenseKey) return;
+  await supabaseAdmin
+    .from("subscriptions")
+    .update({ status: "expired" })
+    .eq("chariow_license_key", licenseKey);
+
+  const { data: subs } = await supabaseAdmin
+    .from("subscriptions")
+    .select("store_id")
+    .eq("chariow_license_key", licenseKey);
+  for (const sub of subs || []) {
+    await supabaseAdmin.from("store_modules").delete().eq("store_id", sub.store_id);
+  }
 }

@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PaymentCheckout } from "@/components/billing/PaymentCheckout";
+import { ChariowLicenseCard } from "@/components/billing/ChariowLicenseCard";
 import { useToast } from "@/hooks/use-toast";
 
 const Billing = () => {
@@ -83,6 +84,9 @@ const Billing = () => {
   return (
     <DashboardLayout title="Facturation">
       <div className="space-y-8">
+        {/* Active Chariow license (only renders if one exists) */}
+        <ChariowLicenseCard />
+
         {/* Payment checkout */}
         <PaymentCheckout />
 

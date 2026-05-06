@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, CreditCard, Smartphone, Wallet, CheckCircle, Globe } from "lucide-react";
+import { Loader2, CreditCard, Smartphone, Wallet, CheckCircle, Globe, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PaymentProvider {
@@ -27,6 +27,7 @@ const providerIcons: Record<string, typeof CreditCard> = {
   paydunya: Smartphone,
   wave: Wallet,
   paystack: Globe,
+  chariow: KeyRound,
 };
 
 const methodLabels: Record<string, string> = {
