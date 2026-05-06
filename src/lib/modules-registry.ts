@@ -256,9 +256,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Warehouse,
     tier: "tier2",
     price: 7000,
+    routes: ["/dashboard/warehouse-posts", "/dashboard/warehouse-stats"],
     features: ["unlimited_preparers", "warehouse_posts", "preparer_productivity"],
     category: "Équipe",
-    available: false,
+    available: true,
   },
   {
     id: "segmentation",

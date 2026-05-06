@@ -74,6 +74,8 @@ const toolItems: SidebarItem[] = [
   { title: "Templates", url: "/dashboard/templates", icon: Mail, requiredModule: "message_templates", requiredRoles: ["admin"] },
   { title: "Scripts d'appel", url: "/dashboard/call-scripts", icon: Phone, requiredModule: "call_center", requiredRoles: ["admin"] },
   { title: "Stats callers", url: "/dashboard/caller-stats", icon: PhoneCall, requiredModule: "call_center", requiredRoles: ["admin"] },
+  { title: "Postes entrepôt", url: "/dashboard/warehouse-posts", icon: Warehouse, requiredModule: "warehouse_team", requiredRoles: ["admin"] },
+  { title: "Stats préparateurs", url: "/dashboard/warehouse-stats", icon: PackageCheck, requiredModule: "warehouse_team", requiredRoles: ["admin"] },
   { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
   { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredRoles: ["admin"] },
   { title: "Landing Pages", url: "/dashboard/landing-pages", icon: Layers, requiredModule: "landing_pages", requiredRoles: ["admin"] },
