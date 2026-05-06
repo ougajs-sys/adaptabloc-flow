@@ -302,60 +302,108 @@ const Login = () => {
 
           {/* SIGNUP TAB */}
           <TabsContent value="signup">
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signup-name">Nom complet</Label>
-                <Input
-                  id="signup-name"
-                  placeholder="Amadou Diallo"
-                  value={signupName}
-                  onChange={(e) => setSignupName(e.target.value)}
-                  required
-                  className="h-11"
-                />
+            {signupSent ? (
+              <div className="space-y-4 text-center py-4">
+                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  💬
+                </div>
+                <h3 className="text-lg font-semibold">Vérifie WhatsApp</h3>
+                <p className="text-sm text-muted-foreground">
+                  On a envoyé un lien de confirmation au <span className="font-medium text-foreground">{signupPhone}</span>.
+                  Clique sur le bouton dans le message pour activer ton compte (valide 30 min).
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11"
+                  disabled={loading || resendCooldown > 0}
+                  onClick={handleResend}
+                >
+                  {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                  {resendCooldown > 0 ? `Renvoyer dans ${resendCooldown}s` : "Renvoyer le lien"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => { setSignupSent(false); setResendCooldown(0); }}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  ← Modifier mes informations
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  placeholder="vous@email.com"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Mot de passe</Label>
-                <Input
-                  id="signup-password"
-                  type="password"
-                  placeholder="Min. 6 caractères"
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
-                <Input
-                  id="signup-confirm"
-                  type="password"
-                  placeholder="••••••••"
-                  value={signupConfirm}
-                  onChange={(e) => setSignupConfirm(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              <Button type="submit" disabled={loading || isLoading} className="w-full h-11">
-                {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-                Créer mon compte
-              </Button>
-            </form>
+            ) : (
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name">Nom complet</Label>
+                  <Input
+                    id="signup-name"
+                    placeholder="Amadou Diallo"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="vous@email.com"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Numéro WhatsApp</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+221771234567"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(e.target.value.replace(/[^\d+]/g, ""))}
+                    required
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Format international avec indicatif pays (ex: +221 pour le Sénégal)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Mot de passe</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="Min. 6 caractères"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
+                  <Input
+                    id="signup-confirm"
+                    type="password"
+                    placeholder="••••••••"
+                    value={signupConfirm}
+                    onChange={(e) => setSignupConfirm(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+                <Button type="submit" disabled={loading || isLoading} className="w-full h-11">
+                  {loading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                  Créer mon compte via WhatsApp
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  On t'enverra un lien sur WhatsApp pour confirmer ton compte
+                </p>
+              </form>
+            )}
           </TabsContent>
         </Tabs>
 
