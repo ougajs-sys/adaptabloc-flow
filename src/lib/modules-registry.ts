@@ -353,9 +353,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Bot,
     tier: "tier3",
     price: 15000,
+    routes: ["/dashboard/ai-assistant"],
     features: ["ai_chat", "ai_recommendations", "ai_reports"],
     category: "Outils",
-    available: false,
+    available: true,
   },
 
   // === TIER 1 – Quotas supplémentaires ===
