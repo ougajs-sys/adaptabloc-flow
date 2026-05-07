@@ -1,28 +1,95 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Truck, MapPin, Phone, CheckCircle2, RotateCcw, Navigation, Package, Banknote, Loader2 } from "lucide-react";
+import { Truck, MapPin, Phone, CheckCircle2, RotateCcw, Navigation, Package, Banknote, Loader2, Radio } from "lucide-react";
 import { useWorkspaceOrders, type WorkspaceOrder } from "@/hooks/useWorkspaceOrders";
 import { getStageByStatus, type OrderPipelineStatus } from "@/lib/team-roles";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useModules } from "@/contexts/ModulesContext";
+import { useToast } from "@/hooks/use-toast";
+
+// ── GPS sharing hook ───────────────────────────────────────────────────────────
+
+function useGpsSharing(enabled: boolean, storeId: string | null) {
+  const watchRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !storeId || !navigator.geolocation) return;
+
+    async function send(pos: GeolocationPosition) {
+      await supabase.rpc("upsert_driver_location" as any, {
+        p_store_id: storeId,
+        p_lat: pos.coords.latitude,
+        p_lng: pos.coords.longitude,
+        p_accuracy: pos.coords.accuracy ?? null,
+        p_speed: pos.coords.speed != null ? pos.coords.speed * 3.6 : null, // m/s → km/h
+        p_heading: pos.coords.heading ?? null,
+        p_on_duty: true,
+      });
+    }
+
+    watchRef.current = navigator.geolocation.watchPosition(send, () => {}, {
+      enableHighAccuracy: true,
+      maximumAge: 10_000,
+    });
+
+    return () => {
+      if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
+    };
+  }, [enabled, storeId]);
+
+  // Mark off-duty when disabled
+  useEffect(() => {
+    if (enabled || !storeId) return;
+    navigator.geolocation?.getCurrentPosition((pos) => {
+      supabase.rpc("upsert_driver_location" as any, {
+        p_store_id: storeId,
+        p_lat: pos.coords.latitude,
+        p_lng: pos.coords.longitude,
+        p_on_duty: false,
+      });
+    });
+  }, [enabled, storeId]);
+}
 
 type DeliveryOutcome = "delivered" | "returned";
 
 const LivreurWorkspace = () => {
+  const { user } = useAuth();
+  const { hasModule } = useModules();
+  const { toast } = useToast();
+  const storeId = user?.store_id ?? null;
+
   const { orders, isLoading, todayStats, updateStatus } = useWorkspaceOrders([
     "ready", "in_transit", "shipping", "delivered", "returned",
   ]);
   const [selectedOrder, setSelectedOrder] = useState<WorkspaceOrder | null>(null);
   const [outcome, setOutcome] = useState<DeliveryOutcome>("delivered");
   const [note, setNote] = useState("");
+  const [gpsEnabled, setGpsEnabled] = useState(false);
+
+  const geoEnabled = hasModule("geo_tracking");
+  useGpsSharing(gpsEnabled, storeId);
+
+  const handleGpsToggle = useCallback((v: boolean) => {
+    if (v && !navigator.geolocation) {
+      toast({ title: "GPS non supporté", description: "Votre navigateur ne supporte pas la géolocalisation.", variant: "destructive" });
+      return;
+    }
+    setGpsEnabled(v);
+    if (v) toast({ title: "Position partagée", description: "Votre position est maintenant visible sur la carte admin." });
+  }, [toast]);
 
   const livreurOrders = orders.filter((o) => ["ready", "in_transit"].includes(o.status));
 
@@ -151,6 +218,24 @@ const LivreurWorkspace = () => {
       </Dialog>
 
       <DashboardLayout title="Espace Livreur" subtitle="Gestion des livraisons">
+        {/* GPS sharing toggle — only shown when geo_tracking module is active */}
+        {geoEnabled && (
+          <Card className={`border-2 transition-colors ${gpsEnabled ? "border-emerald-500/50 bg-emerald-500/5" : "border-border/60"}`}>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${gpsEnabled ? "bg-emerald-500/20" : "bg-muted"}`}>
+                <Radio size={18} className={gpsEnabled ? "text-emerald-500 animate-pulse" : "text-muted-foreground"} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Partage de position GPS</p>
+                <p className="text-xs text-muted-foreground">
+                  {gpsEnabled ? "Votre position est visible sur la carte admin en temps réel." : "Activez pour que l'admin puisse vous suivre."}
+                </p>
+              </div>
+              <Switch checked={gpsEnabled} onCheckedChange={handleGpsToggle} />
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="border-border/60">
             <CardContent className="p-4 text-center">

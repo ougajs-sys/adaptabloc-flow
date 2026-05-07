@@ -306,9 +306,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: MapPin,
     tier: "tier3",
     price: 10000,
+    routes: ["/dashboard/geo-tracking"],
     features: ["live_map", "driver_location", "delivery_eta"],
     category: "Livraisons",
-    available: false,
+    available: true,
   },
   {
     id: "automations",
