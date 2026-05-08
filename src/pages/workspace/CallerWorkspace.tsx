@@ -331,7 +331,7 @@ const CallerWorkspace = () => {
                       <CardContent className="px-3 pb-3 pt-0">
                         <ScrollArea className="h-40">
                           <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed">
-                            {fillScript(activeScript.content, selectedOrder, user?.store_name)}
+                            {fillScript(activeScript.content, selectedOrder)}
                           </pre>
                         </ScrollArea>
                       </CardContent>

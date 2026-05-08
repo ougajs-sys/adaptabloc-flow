@@ -59,14 +59,14 @@ export default function WarehouseStats() {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
-        .in("id", ids);
+        .select("user_id, name, email")
+        .in("user_id", ids);
 
       return (data || []).map((p: any) => {
-        const profile = (profiles || []).find((pr: any) => pr.id === p.preparer_id);
+        const profile = (profiles || []).find((pr: any) => pr.user_id === p.preparer_id);
         return {
           ...p,
-          preparer_name: profile?.full_name || "Préparateur",
+          preparer_name: profile?.name || "Préparateur",
           preparer_email: profile?.email || "",
         } as PreparerPerf;
       });
