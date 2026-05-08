@@ -94,14 +94,14 @@ export default function CallerStats() {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
-        .in("id", callerIds);
+        .select("user_id, name, email")
+        .in("user_id", callerIds);
 
       return (perfData || []).map((p: any) => {
-        const profile = (profiles || []).find((pr: any) => pr.id === p.caller_id);
+        const profile = (profiles || []).find((pr: any) => pr.user_id === p.caller_id);
         return {
           ...p,
-          caller_name: profile?.full_name || "Caller",
+          caller_name: profile?.name || "Caller",
           caller_email: profile?.email || "",
         } as CallerPerf;
       });
@@ -124,14 +124,14 @@ export default function CallerStats() {
         .limit(20);
       if (error) throw error;
 
-      const callerIds: string[] = [...new Set((data || []).map((d: any) => d.caller_id))];
+      const callerIds: string[] = Array.from(new Set((data || []).map((d: any) => d.caller_id as string)));
       const { data: profiles } = callerIds.length
-        ? await supabase.from("profiles").select("id, full_name").in("id", callerIds)
-        : { data: [] };
+        ? await supabase.from("profiles").select("user_id, name").in("user_id", callerIds)
+        : { data: [] as any[] };
 
       return (data || []).map((d: any) => ({
         ...d,
-        caller_name: (profiles || []).find((p: any) => p.id === d.caller_id)?.full_name || "Caller",
+        caller_name: (profiles || []).find((p: any) => p.user_id === d.caller_id)?.name || "Caller",
       })) as PendingCallback[];
     },
     refetchInterval: 60_000,
