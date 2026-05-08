@@ -1,0 +1,1 @@
+DELETE FROM public.whatsapp_send_log WHERE phone_e164 = '+2250707062126' AND created_at > now() - interval '2 hours';
