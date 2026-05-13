@@ -318,9 +318,10 @@ export const modulesRegistry: ModuleDefinition[] = [
     icon: Sparkles,
     tier: "tier3",
     price: 12000,
+    routes: ["/dashboard/automations"],
     features: ["auto_reorder", "auto_pricing", "auto_categorize"],
     category: "Outils",
-    available: false,
+    available: true,
   },
   {
     id: "api",
