@@ -42,6 +42,7 @@ import LoyaltyProgram from "./pages/LoyaltyProgram";
 import MultiStoreOverview from "./pages/MultiStoreOverview";
 import ApiManager from "./pages/ApiManager";
 import GeoTracking from "./pages/GeoTracking";
+import AiAssistant from "./pages/AiAssistant";
 import Segments from "./pages/Segments";
 import Stock from "./pages/Stock";
 import TrackOrder from "./pages/TrackOrder";
@@ -159,6 +160,7 @@ const AppRoutes = () => (
     <Route path="/dashboard/multi-store" element={<ProtectedRoute allowedRoles={["admin"]}><MultiStoreOverview /></ProtectedRoute>} />
     <Route path="/dashboard/api" element={<ProtectedRoute allowedRoles={["admin"]}><ApiManager /></ProtectedRoute>} />
     <Route path="/dashboard/geo-tracking" element={<ProtectedRoute allowedRoles={["admin"]}><GeoTracking /></ProtectedRoute>} />
+    <Route path="/dashboard/ai-assistant" element={<ProtectedRoute allowedRoles={["admin"]}><AiAssistant /></ProtectedRoute>} />
     <Route path="/dashboard/segments" element={<ProtectedRoute allowedRoles={["admin"]}><Segments /></ProtectedRoute>} />
     <Route path="/dashboard/stock" element={<ProtectedRoute allowedRoles={["admin", "preparer"]}><Stock /></ProtectedRoute>} />
     <Route path="/track/:token" element={<TrackOrder />} />
