@@ -67,6 +67,21 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Rate limit: 60 AI messages per store per hour
+    const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: hitCount } = await supabase
+      .from('rate_limit_hits')
+      .select('id', { count: 'exact', head: true })
+      .eq('identifier', store_id)
+      .eq('endpoint', 'ai-chat')
+      .gte('hit_at', windowStart)
+    if ((hitCount ?? 0) >= 60) {
+      return new Response(JSON.stringify({ error: 'Trop de requêtes. Réessayez dans une heure.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    await supabase.from('rate_limit_hits').insert({ identifier: store_id, endpoint: 'ai-chat' })
+
     // Fetch store context for system prompt
     const today = new Date().toISOString().split('T')[0]
     const [storeRes, ordersRes, revenueRes] = await Promise.all([

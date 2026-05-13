@@ -477,6 +477,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Rate limit: 10 payment initiations per user per hour
+    const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: hitCount } = await supabaseAdmin
+      .from("rate_limit_hits")
+      .select("id", { count: "exact", head: true })
+      .eq("identifier", userId)
+      .eq("endpoint", "initiate-payment")
+      .gte("hit_at", windowStart);
+    if ((hitCount ?? 0) >= 10) {
+      return new Response(JSON.stringify({ error: "Trop de tentatives de paiement. Réessayez dans une heure." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    await supabaseAdmin.from("rate_limit_hits").insert({ identifier: userId, endpoint: "initiate-payment" });
+
     // Get provider config
     const { data: providerData } = await supabaseAdmin
       .from("payment_providers")

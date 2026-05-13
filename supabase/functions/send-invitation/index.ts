@@ -57,6 +57,23 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Rate limit: 20 invitations per store per hour
+    const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: hitCount } = await adminClient
+      .from("rate_limit_hits")
+      .select("id", { count: "exact", head: true })
+      .eq("identifier", store_id)
+      .eq("endpoint", "send-invitation")
+      .gte("hit_at", windowStart);
+    if ((hitCount ?? 0) >= 20) {
+      return new Response(JSON.stringify({ error: "Trop d'invitations envoyées. Réessayez dans une heure." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    await adminClient.from("rate_limit_hits").insert({ identifier: store_id, endpoint: "send-invitation" });
+
     const origin = req.headers.get("origin") || "https://intramate.pro";
 
     // Build redirect URL — includes the invitation token so the accept page
@@ -82,7 +99,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("send-invitation error:", err);
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
