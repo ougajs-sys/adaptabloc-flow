@@ -78,13 +78,16 @@ Deno.serve(async (req) => {
     // Signature header: x-chariow-signature = HMAC-SHA256(CHARIOW_WEBHOOK_SECRET, rawBody)
     if (body.event && (body.data || body.payload)) {
       const webhookSecret = Deno.env.get("CHARIOW_WEBHOOK_SECRET");
-      let signatureValid = !webhookSecret; // if no secret configured, treat as not-checked (true for processing)
-      if (webhookSecret) {
-        const receivedSig = req.headers.get("x-chariow-signature") ||
-          req.headers.get("chariow-signature") || "";
-        const expectedSig = await computeHmacSha256(webhookSecret, rawBody);
-        signatureValid = secureCompare(receivedSig, expectedSig);
-        if (!signatureValid) {
+      if (!webhookSecret) {
+        return new Response(JSON.stringify({ error: "Webhook secret not configured" }), {
+          status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const receivedSig = req.headers.get("x-chariow-signature") ||
+        req.headers.get("chariow-signature") || "";
+      const expectedSig = await computeHmacSha256(webhookSecret, rawBody);
+      const signatureValid = secureCompare(receivedSig, expectedSig);
+      if (!signatureValid) {
           // Log the event but reject
           await supabaseAdmin.from("chariow_webhook_events").insert({
             event_id: String(body.id || crypto.randomUUID()),
@@ -97,7 +100,6 @@ Deno.serve(async (req) => {
             status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-      }
       return await handleChariowWebhook(body, supabaseAdmin, signatureValid);
     }
 
@@ -161,7 +163,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("payment-webhook unhandled error:", err);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
