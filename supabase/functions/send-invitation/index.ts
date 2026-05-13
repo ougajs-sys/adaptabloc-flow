@@ -87,6 +87,32 @@ Deno.serve(async (req) => {
     });
 
     if (inviteError) {
+      // If the user already has a Supabase Auth account, inviteUserByEmail fails.
+      // Fall back to generating a one-time magic link the admin can share manually.
+      const alreadyExists =
+        (inviteError as any).status === 422 ||
+        inviteError.message?.toLowerCase().includes("already registered") ||
+        inviteError.message?.toLowerCase().includes("already been registered");
+
+      if (alreadyExists) {
+        const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+          type: "magiclink",
+          email,
+          options: { redirectTo },
+        });
+        if (linkError || !linkData?.properties?.action_link) {
+          console.error("generateLink error:", linkError);
+          return new Response(JSON.stringify({ error: inviteError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({ success: true, action_link: linkData.properties.action_link }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       console.error("Invite error:", inviteError);
       return new Response(JSON.stringify({ error: inviteError.message }), {
         status: 400,
