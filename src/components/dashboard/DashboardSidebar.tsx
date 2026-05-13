@@ -28,6 +28,7 @@ import {
   Code,
   MapPin,
   Bot,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -86,6 +87,7 @@ const toolItems: SidebarItem[] = [
   { title: "API & Webhooks", url: "/dashboard/api", icon: Code, requiredModule: "api", requiredRoles: ["admin"] },
   { title: "Géolocalisation", url: "/dashboard/geo-tracking", icon: MapPin, requiredModule: "geo_tracking", requiredRoles: ["admin"] },
   { title: "Assistant IA", url: "/dashboard/ai-assistant", icon: Bot, requiredModule: "ai_assistant", requiredRoles: ["admin"] },
+  { title: "Automatisations", url: "/dashboard/automations", icon: Sparkles, requiredModule: "automations", requiredRoles: ["admin"] },
   { title: "Statuts", url: "/dashboard/statuses", icon: Tags, requiredModule: "custom_status", requiredRoles: ["admin"] },
   { title: "Formulaires", url: "/dashboard/forms", icon: FormInput, requiredRoles: ["admin"] },
   { title: "Landing Pages", url: "/dashboard/landing-pages", icon: Layers, requiredModule: "landing_pages", requiredRoles: ["admin"] },
