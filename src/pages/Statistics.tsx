@@ -61,7 +61,7 @@ export default function Statistics() {
       if (!storeId) return [];
       let q = supabase
         .from("orders")
-        .select("id, status, total_amount, created_at, updated_at, confirmed_by, prepared_by")
+        .select("id, status, total_amount, created_at, confirmed_at, confirmed_by, prepared_by")
         .eq("store_id", storeId);
       if (cutoff) q = q.gte("created_at", cutoff);
       const { data } = await q.order("created_at", { ascending: false });
@@ -132,14 +132,14 @@ export default function Statistics() {
         ? Math.round(delivered.reduce((s, o) => s + (o.total_amount || 0), 0) / delivered.length)
         : 0;
 
-    // Avg time from order creation to confirmation, approximated via updated_at
-    const confirmedOrders = orders.filter((o) => o.confirmed_by && (o as any).updated_at);
+    // Avg time from order creation to confirmation using confirmed_at timestamp
+    const confirmedOrders = orders.filter((o) => o.confirmed_by && (o as any).confirmed_at);
     const avgPrepHours =
       confirmedOrders.length > 0
         ? Math.round(
             (confirmedOrders.reduce((sum, o) => {
               const diffH =
-                (new Date((o as any).updated_at).getTime() - new Date(o.created_at).getTime()) /
+                (new Date((o as any).confirmed_at).getTime() - new Date(o.created_at).getTime()) /
                 3_600_000;
               return sum + Math.min(Math.max(0, diffH), 72);
             }, 0) /
