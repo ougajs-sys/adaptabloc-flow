@@ -202,7 +202,7 @@ const Orders = () => {
         }
       }
 
-      toast({ title: "Commande créée" });
+      toast({ title: "Commande créée", description: `N° ${newOrder.order_number}` });
       setNewOrderOpen(false);
       invalidateOrdersAndRelated();
     } finally {
