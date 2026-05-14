@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { lovable } from "@/integrations/lovable/index";
@@ -31,6 +31,9 @@ const Login = () => {
   const [signupConfirm, setSignupConfirm] = useState("");
   const [signupSent, setSignupSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,9 +78,10 @@ const Login = () => {
       if ((data as any)?.error) throw new Error((data as any).error);
       setSignupSent(true);
       setResendCooldown(60);
-      const interval = setInterval(() => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      cooldownRef.current = setInterval(() => {
         setResendCooldown((c) => {
-          if (c <= 1) { clearInterval(interval); return 0; }
+          if (c <= 1) { clearInterval(cooldownRef.current!); cooldownRef.current = null; return 0; }
           return c - 1;
         });
       }, 1000);
@@ -99,9 +103,10 @@ const Login = () => {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setResendCooldown(60);
-      const interval = setInterval(() => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      cooldownRef.current = setInterval(() => {
         setResendCooldown((c) => {
-          if (c <= 1) { clearInterval(interval); return 0; }
+          if (c <= 1) { clearInterval(cooldownRef.current!); cooldownRef.current = null; return 0; }
           return c - 1;
         });
       }, 1000);
