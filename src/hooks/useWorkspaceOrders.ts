@@ -120,7 +120,10 @@ export function useWorkspaceOrders(statusFilter: string[]) {
       if (notes !== undefined) updateData.notes = notes;
 
       // Set confirmed_by / prepared_by based on role action
-      if (status === "confirmed" && user?.id) updateData.confirmed_by = user.id;
+      if (status === "confirmed" && user?.id) {
+        updateData.confirmed_by = user.id;
+        updateData.confirmed_at = new Date().toISOString();
+      }
       if (status === "preparing" && user?.id) updateData.prepared_by = user.id;
 
       const { error } = await supabase

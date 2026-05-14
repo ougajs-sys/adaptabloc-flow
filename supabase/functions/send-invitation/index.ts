@@ -44,19 +44,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify caller is admin of the store
-    const { data: isAdmin } = await callerClient.rpc("has_role", {
-      _store_id: store_id,
-      _role: "admin",
-    });
-    if (!isAdmin) {
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Verify caller is admin of the store via direct query (avoids RPC availability issues)
+    const { data: adminRole } = await adminClient
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", caller.id)
+      .eq("store_id", store_id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRole) {
       return new Response(JSON.stringify({ error: "Not an admin of this store" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     // Rate limit: 20 invitations per store per hour
     const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -87,6 +90,32 @@ Deno.serve(async (req) => {
     });
 
     if (inviteError) {
+      // If the user already has a Supabase Auth account, inviteUserByEmail fails.
+      // Fall back to generating a one-time magic link the admin can share manually.
+      const alreadyExists =
+        (inviteError as any).status === 422 ||
+        inviteError.message?.toLowerCase().includes("already registered") ||
+        inviteError.message?.toLowerCase().includes("already been registered");
+
+      if (alreadyExists) {
+        const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+          type: "magiclink",
+          email,
+          options: { redirectTo },
+        });
+        if (linkError || !linkData?.properties?.action_link) {
+          console.error("generateLink error:", linkError);
+          return new Response(JSON.stringify({ error: inviteError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({ success: true, action_link: linkData.properties.action_link }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       console.error("Invite error:", inviteError);
       return new Response(JSON.stringify({ error: inviteError.message }), {
         status: 400,

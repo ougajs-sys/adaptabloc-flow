@@ -46,6 +46,9 @@ function GeneralTab() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [currency, setCurrency] = useState("XOF");
+  const [timezone, setTimezone] = useState("Africa/Abidjan");
+  const [language, setLanguage] = useState("fr");
 
   useEffect(() => {
     if (store) {
@@ -53,6 +56,9 @@ function GeneralTab() {
       setEmail(store.email || "");
       setPhone(store.phone || "");
       setAddress(store.address || "");
+      setCurrency((store as any).currency || "XOF");
+      setTimezone((store as any).timezone || "Africa/Abidjan");
+      setLanguage((store as any).language || "fr");
     }
   }, [store]);
 
@@ -60,12 +66,12 @@ function GeneralTab() {
     mutationFn: async () => {
       const { error } = await supabase
         .from("stores")
-        .update({ name: shopName, email, phone, address })
+        .update({ name: shopName, email, phone, address, currency, timezone, language } as any)
         .eq("id", storeId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["store-settings", storeId] });
       toast({ title: "Paramètres enregistrés", description: "Vos informations ont été mises à jour." });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -121,7 +127,7 @@ function GeneralTab() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Devise</Label>
-              <Select defaultValue="XOF">
+              <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="XOF">FCFA (XOF)</SelectItem>
@@ -135,7 +141,7 @@ function GeneralTab() {
             </div>
             <div className="space-y-2">
               <Label>Fuseau horaire</Label>
-              <Select defaultValue="Africa/Abidjan">
+              <Select value={timezone} onValueChange={setTimezone}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Africa/Abidjan">Abidjan (GMT+0)</SelectItem>
@@ -148,7 +154,7 @@ function GeneralTab() {
             </div>
             <div className="space-y-2">
               <Label>Langue</Label>
-              <Select defaultValue="fr">
+              <Select value={language} onValueChange={setLanguage}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fr">Français</SelectItem>

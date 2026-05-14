@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Send, MessageSquare, Mail, Phone, Eye, MousePointerClick, Loader2, Trash2 } from "lucide-react";
+import { Plus, Send, MessageSquare, Mail, Phone, Eye, MousePointerClick, Loader2, Trash2, PlayCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +57,7 @@ const CampaignsContent = ({ newOpen, setNewOpen }: CampaignsContentProps) => {
   const [channel, setChannel] = useState<"sms" | "whatsapp" | "email">("whatsapp");
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   // Fetch campaigns
   const { data: campaigns = [], isLoading } = useQuery({
@@ -93,6 +94,54 @@ const CampaignsContent = ({ newOpen, setNewOpen }: CampaignsContentProps) => {
       toast({ title: "Campagne créée", description: `"${name}" est en brouillon.` });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Send campaign — counts all store customers, inserts recipients, updates stats
+  const sendMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      const { data: customers, error: custErr } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("store_id", storeId!);
+      if (custErr) throw custErr;
+
+      const recipientCount = customers?.length ?? 0;
+
+      if (recipientCount > 0) {
+        const rows = customers!.map((c) => ({
+          campaign_id: campaignId,
+          customer_id: c.id,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        }));
+        // upsert to handle duplicates from re-sends
+        const { error: recErr } = await supabase
+          .from("campaign_recipients")
+          .upsert(rows, { onConflict: "campaign_id,customer_id", ignoreDuplicates: true });
+        if (recErr) throw recErr;
+      }
+
+      const { error: updErr } = await supabase
+        .from("campaigns")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          recipient_count: recipientCount,
+        })
+        .eq("id", campaignId);
+      if (updErr) throw updErr;
+
+      return recipientCount;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns", storeId] });
+      setSendingId(null);
+      toast({ title: "Campagne envoyée", description: `${count} destinataire(s) enregistré(s).` });
+    },
+    onError: (e: any) => {
+      setSendingId(null);
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    },
   });
 
   // Delete campaign
@@ -165,6 +214,28 @@ const CampaignsContent = ({ newOpen, setNewOpen }: CampaignsContentProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Send confirmation dialog */}
+      <AlertDialog open={!!sendingId} onOpenChange={(v) => { if (!v) setSendingId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Envoyer cette campagne ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La campagne sera marquée comme envoyée et tous les clients de la boutique seront enregistrés comme destinataires.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => sendingId && sendMutation.mutate(sendingId)}
+              disabled={sendMutation.isPending}
+            >
+              {sendMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+              Envoyer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete dialog */}
       <AlertDialog open={!!deletingId} onOpenChange={(v) => { if (!v) setDeletingId(null); }}>
@@ -252,9 +323,22 @@ const CampaignsContent = ({ newOpen, setNewOpen }: CampaignsContentProps) => {
                           {new Date(c.created_at).toLocaleDateString("fr-FR")}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingId(c.id)}>
-                            <Trash2 size={14} />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {(c.status === "draft" || c.status === "scheduled") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-green-600"
+                                title="Envoyer"
+                                onClick={() => setSendingId(c.id)}
+                              >
+                                <PlayCircle size={14} />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingId(c.id)}>
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

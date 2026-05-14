@@ -30,7 +30,10 @@ const Dashboard = () => {
       const orders = ordersRes.data || [];
       const orderItems = orderItemsRes.data || [];
 
-      const revenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0);
+      const REVENUE_STATUSES = ["confirmed", "preparing", "ready", "shipping", "delivered"];
+      const revenue = orders
+        .filter((o) => REVENUE_STATUSES.includes(o.status))
+        .reduce((s, o) => s + (o.total_amount || 0), 0);
       const ordersCount = orders.length;
       const customersCount = customersRes.count || 0;
       const deliveriesCount = deliveriesRes.count || 0;
@@ -64,7 +67,9 @@ const Dashboard = () => {
         const monthOrders = orders.filter((o) => o.created_at.startsWith(monthKey));
         revenueByMonth.push({
           month: MONTH_LABELS[d.getMonth()],
-          revenue: monthOrders.reduce((s, o) => s + (o.total_amount || 0), 0),
+          revenue: monthOrders
+            .filter((o) => REVENUE_STATUSES.includes(o.status))
+            .reduce((s, o) => s + (o.total_amount || 0), 0),
           orders: monthOrders.length,
         });
       }

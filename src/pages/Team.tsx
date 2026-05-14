@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, UserPlus, Trash2, Mail, Clock } from "lucide-react";
+import { Plus, UserPlus, Trash2, Mail, Clock, RefreshCw } from "lucide-react";
 import { useModules } from "@/contexts/ModulesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -45,6 +45,7 @@ interface MemberRow {
 
 interface InvitationRow {
   id: string;
+  token: string;
   email: string;
   role: TeamRole;
   status: string;
@@ -103,6 +104,7 @@ const Team = () => {
       if (error) throw error;
       return (data || []).map((inv) => ({
         id: inv.id,
+        token: inv.token || "",
         email: inv.email,
         role: dbToFrontRole[inv.role] || "caller",
         status: inv.status || "pending",
@@ -111,36 +113,65 @@ const Team = () => {
     },
   });
 
+  const handleInviteResult = (emailSent: boolean, actionLink?: string) => {
+    if (emailSent) return;
+    if (actionLink) {
+      navigator.clipboard.writeText(actionLink).catch(console.error);
+      toast({
+        title: "Lien d'invitation copié",
+        description: "Cet utilisateur a déjà un compte. Le lien a été copié dans le presse-papiers pour que vous puissiez le partager manuellement.",
+      });
+    } else {
+      toast({
+        title: "Email non envoyé",
+        description: "L'invitation est enregistrée mais l'email n'a pas pu être envoyé. Vérifiez la configuration SMTP dans Supabase.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Invite mutation
   const inviteMutation = useMutation({
     mutationFn: async (values: { email: string; role: TeamRole }) => {
       const dbRole = frontToDbRole[values.role] as any;
-      // 1. Insert invitation in DB — retrieve the generated token
       const { data: inv, error } = await supabase
         .from("team_invitations")
         .insert({ store_id: storeId!, email: values.email, role: dbRole })
         .select("token")
         .single();
       if (error) throw error;
-      // 2. Send invitation email via edge function, passing the token so the
-      //    accept-invitation page can create the user_role after auth.
-      const { error: fnError } = await supabase.functions.invoke("send-invitation", {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("send-invitation", {
         body: { email: values.email, store_id: storeId, invitation_token: inv?.token },
       });
-      if (fnError) {
-        console.error("send-invitation error:", fnError);
-        // Invitation is saved in DB; email sending failure is non-blocking
-        // but we show a warning so the admin knows.
-        toast({
-          title: "Invitation enregistrée",
-          description: "L'email n'a pas pu être envoyé automatiquement. Communiquez le lien manuellement si nécessaire.",
-          variant: "destructive",
-        });
+      if (fnError) console.error("send-invitation error:", fnError);
+      return { emailSent: !fnError, actionLink: (fnData as any)?.action_link as string | undefined };
+    },
+    onSuccess: ({ emailSent, actionLink }) => {
+      queryClient.invalidateQueries({ queryKey: ["team-invitations"] });
+      if (emailSent) {
+        toast({ title: "Invitation envoyée", description: "Un email a été envoyé à l'invité." });
+      } else {
+        handleInviteResult(false, actionLink);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["team-invitations"] });
-      toast({ title: "Invitation envoyée" });
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Resend invitation email mutation
+  const resendInviteMutation = useMutation({
+    mutationFn: async (inv: InvitationRow) => {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("send-invitation", {
+        body: { email: inv.email, store_id: storeId, invitation_token: inv.token },
+      });
+      if (fnError) console.error("resend-invitation error:", fnError);
+      return { emailSent: !fnError, actionLink: (fnData as any)?.action_link as string | undefined };
+    },
+    onSuccess: ({ emailSent, actionLink }) => {
+      if (emailSent) {
+        toast({ title: "Invitation renvoyée", description: "Un nouvel email a été envoyé à l'invité." });
+      } else {
+        handleInviteResult(false, actionLink);
+      }
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -148,6 +179,17 @@ const Team = () => {
   // Delete member mutation
   const deleteMemberMutation = useMutation({
     mutationFn: async (member: MemberRow) => {
+      // Guard: prevent removing the last admin
+      if (member.role === "admin") {
+        const { count } = await supabase
+          .from("user_roles")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", storeId!)
+          .eq("role", "admin");
+        if ((count ?? 0) <= 1) {
+          throw new Error("Impossible de supprimer le dernier administrateur de la boutique.");
+        }
+      }
       // Delete user_role
       const { error: roleErr } = await supabase.from("user_roles").delete().eq("id", member.id);
       if (roleErr) throw roleErr;
@@ -296,9 +338,20 @@ const Team = () => {
                           {inv.created_at ? new Date(inv.created_at).toLocaleDateString("fr-FR") : "—"}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingInvite(inv)}>
-                            <Trash2 size={14} />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Renvoyer l'invitation"
+                              disabled={resendInviteMutation.isPending}
+                              onClick={() => resendInviteMutation.mutate(inv)}
+                            >
+                              <RefreshCw size={14} className={resendInviteMutation.isPending ? "animate-spin" : ""} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeletingInvite(inv)}>
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

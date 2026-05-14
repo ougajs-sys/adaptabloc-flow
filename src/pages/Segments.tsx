@@ -167,12 +167,13 @@ const Segments = () => {
         .eq("store_id", storeId),
       supabase
         .from("orders")
-        .select("customer_id, total_amount, created_at")
-        .eq("store_id", storeId),
+        .select("customer_id, total_amount, created_at, status")
+        .eq("store_id", storeId)
+        .not("status", "in", '("cancelled","returned")'),
     ]);
 
     const statMap = new Map<string, { total_orders: number; total_spent: number; last_order_at: string }>();
-    (orders || []).forEach((o: { customer_id?: string | null; total_amount?: number; created_at?: string }) => {
+    (orders || []).forEach((o: { customer_id?: string | null; total_amount?: number; created_at?: string; status?: string }) => {
       if (!o.customer_id) return;
       const cur = statMap.get(o.customer_id) || { total_orders: 0, total_spent: 0, last_order_at: "" };
       cur.total_orders++;

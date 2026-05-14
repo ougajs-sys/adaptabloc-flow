@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       supabase.from('stores').select('name, phone, email').eq('id', store_id).single(),
       supabase.from('orders').select('status, created_at').eq('store_id', store_id)
         .gte('created_at', `${today}T00:00:00Z`),
-      supabase.from('orders').select('total_price, status').eq('store_id', store_id)
+      supabase.from('orders').select('total_amount, status').eq('store_id', store_id)
         .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
     ])
 
@@ -97,11 +97,11 @@ Deno.serve(async (req) => {
     const monthOrders = revenueRes.data ?? []
 
     const todayCount = todayOrders.length
-    const pendingCount = todayOrders.filter(o => o.status === 'pending').length
+    const pendingCount = todayOrders.filter(o => o.status === 'new').length
     const confirmedCount = todayOrders.filter(o => o.status === 'confirmed').length
     const monthRevenue = monthOrders
       .filter(o => ['confirmed', 'delivered'].includes(o.status))
-      .reduce((sum, o) => sum + (o.total_price ?? 0), 0)
+      .reduce((sum, o) => sum + (o.total_amount ?? 0), 0)
 
     const systemPrompt = `Tu es un assistant IA intelligent et bienveillant pour la boutique "${store?.name ?? 'votre boutique'}".
 Tu aides les gérants à comprendre leurs données, prendre de meilleures décisions et optimiser leurs opérations.

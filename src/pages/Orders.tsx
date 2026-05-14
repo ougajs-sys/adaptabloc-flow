@@ -202,7 +202,7 @@ const Orders = () => {
         }
       }
 
-      toast({ title: "Commande créée" });
+      toast({ title: "Commande créée", description: `N° ${newOrder.order_number}` });
       setNewOrderOpen(false);
       invalidateOrdersAndRelated();
     } finally {
@@ -296,7 +296,9 @@ const Orders = () => {
     const previousStatus = order.status;
     const dbStatus = mapToDbStatus(nextStatus);
     optimisticStatusUpdate(orderId, nextStatus);
-    const { error } = await supabase.from("orders").update({ status: dbStatus as any }).eq("id", order.dbId);
+    const updatePayload: Record<string, unknown> = { status: dbStatus };
+    if (nextStatus === "confirmed") updatePayload.confirmed_at = new Date().toISOString();
+    const { error } = await supabase.from("orders").update(updatePayload as any).eq("id", order.dbId);
     if (error) {
       optimisticStatusUpdate(orderId, previousStatus);
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
