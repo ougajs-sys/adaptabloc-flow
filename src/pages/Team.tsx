@@ -179,6 +179,17 @@ const Team = () => {
   // Delete member mutation
   const deleteMemberMutation = useMutation({
     mutationFn: async (member: MemberRow) => {
+      // Guard: prevent removing the last admin
+      if (member.role === "admin") {
+        const { count } = await supabase
+          .from("user_roles")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", storeId!)
+          .eq("role", "admin");
+        if ((count ?? 0) <= 1) {
+          throw new Error("Impossible de supprimer le dernier administrateur de la boutique.");
+        }
+      }
       // Delete user_role
       const { error: roleErr } = await supabase.from("user_roles").delete().eq("id", member.id);
       if (roleErr) throw roleErr;

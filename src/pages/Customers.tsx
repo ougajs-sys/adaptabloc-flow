@@ -209,7 +209,11 @@ const Customers = () => {
 
     // Detect delimiter (comma or semicolon)
     const delim = lines[0].includes(";") ? ";" : ",";
-    const headers = lines[0].split(delim).map((h) => h.trim().toLowerCase().replace(/[^a-z0-9éèêëàâîïôùûü]/g, ""));
+    const headers = lines[0].split(delim).map((h) =>
+      h.trim().toLowerCase()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")  // strip diacritics: "téléphone" → "telephone"
+        .replace(/[^a-z0-9]/g, "")                          // keep only alphanumeric
+    );
 
     const findCol = (...keys: string[]) => headers.findIndex((h) => keys.some((k) => h.includes(k)));
     const colName  = findCol("nom", "name", "prenom");
@@ -237,10 +241,10 @@ const Customers = () => {
       return;
     }
 
-    // Upsert by phone to avoid duplicates (ignore conflicts)
+    // Upsert by phone: update existing customers rather than silently skip them
     const { error } = await supabase.from("customers").upsert(customers, {
       onConflict: "store_id,phone",
-      ignoreDuplicates: true,
+      ignoreDuplicates: false,
     } as any);
 
     setImporting(false);

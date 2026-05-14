@@ -176,34 +176,48 @@ Deno.serve(async (req) => {
         .limit(1)
 
       const product = products?.[0];
-      const unitPrice = product ? product.price : 0;
-      const totalPrice = unitPrice * quantity;
 
-      const { error: itemError } = await supabaseClient
-        .from('order_items')
-        .insert({
+      if (!product) {
+        // Product name provided but not found in catalog — record as unpriced item for manual review
+        console.warn(`submit-form: product not found for name "${productValue}", order ${order.id} created without price`);
+        await supabaseClient.from('order_items').insert({
           order_id: order.id,
-          product_id: product?.id,
-          product_name: product ? product.name : String(productValue),
+          product_id: null,
+          product_name: String(productValue),
           quantity,
-          unit_price: unitPrice,
-          total_price: totalPrice
-        })
+          unit_price: 0,
+          total_price: 0,
+        });
+        // Do NOT update total_amount — leave it at 0 (needs manual pricing)
+      } else {
+        const unitPrice = product.price;
+        const totalPrice = unitPrice * quantity;
 
-      if (itemError) {
-        console.error('Order item creation failed:', itemError)
-        throw new Error('Failed to create order item')
-      }
+        const { error: itemError } = await supabaseClient
+          .from('order_items')
+          .insert({
+            order_id: order.id,
+            product_id: product.id,
+            product_name: product.name,
+            quantity,
+            unit_price: unitPrice,
+            total_price: totalPrice,
+          })
 
-      // Update total amount on order
-      const { error: totalError } = await supabaseClient
-        .from('orders')
-        .update({ total_amount: totalPrice })
-        .eq('id', order.id)
+        if (itemError) {
+          console.error('Order item creation failed:', itemError)
+          throw new Error('Failed to create order item')
+        }
 
-      if (totalError) {
-        console.error('Total amount update failed:', totalError)
-        throw new Error('Failed to update order total')
+        const { error: totalError } = await supabaseClient
+          .from('orders')
+          .update({ total_amount: totalPrice })
+          .eq('id', order.id)
+
+        if (totalError) {
+          console.error('Total amount update failed:', totalError)
+          throw new Error('Failed to update order total')
+        }
       }
     }
 
