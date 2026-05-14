@@ -19,8 +19,14 @@ CREATE INDEX IF NOT EXISTS idx_orders_prepared_by
   ON public.orders(prepared_by);
 
 -- assigned_driver_id is used in the deliveries + driver workspace queries
-CREATE INDEX IF NOT EXISTS idx_orders_assigned_driver
-  ON public.orders(assigned_driver_id);
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'assigned_driver_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_orders_assigned_driver ON public.orders(assigned_driver_id);
+  END IF;
+END $$;
 
 -- Composite index for date-range revenue queries (store + created_at)
 CREATE INDEX IF NOT EXISTS idx_orders_store_created_at
