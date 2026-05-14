@@ -78,15 +78,25 @@ const Products = () => {
       }
 
       const productIds = (prods || []).map((p) => p.id);
-      const { data: variants } = productIds.length > 0
-        ? await supabase.from("product_variants").select("*").in("product_id", productIds)
-        : { data: [] };
+      const [{ data: variants }, { data: salesRows }] = await Promise.all([
+        productIds.length > 0
+          ? supabase.from("product_variants").select("*").in("product_id", productIds)
+          : Promise.resolve({ data: [] }),
+        productIds.length > 0
+          ? supabase.from("order_items").select("product_id, quantity").in("product_id", productIds)
+          : Promise.resolve({ data: [] }),
+      ]);
 
       const variantMap = new Map<string, ProductVariant[]>();
       (variants || []).forEach((v) => {
         const list = variantMap.get(v.product_id) || [];
         list.push({ id: v.id, label: v.name, stock: v.stock ?? 0 });
         variantMap.set(v.product_id, list);
+      });
+
+      const salesMap = new Map<string, number>();
+      (salesRows || []).forEach((row) => {
+        salesMap.set(row.product_id, (salesMap.get(row.product_id) || 0) + (row.quantity || 0));
       });
 
       return (prods || []).map((p) => {
@@ -102,7 +112,7 @@ const Products = () => {
           variants: pvs,
           image: p.image_url || "📦",
           status: !p.is_active ? "draft" : totalStock === 0 ? "out_of_stock" : "active",
-          sales: 0,
+          sales: salesMap.get(p.id) || 0,
         };
       });
     },
