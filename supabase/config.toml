@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.check-subscriptions]
 verify_jwt = false
+
+[functions.whatsapp-accept-invitation]
+verify_jwt = false

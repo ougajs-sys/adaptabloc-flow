@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, UserPlus, Trash2, Mail, Clock } from "lucide-react";
+import { Plus, UserPlus, Trash2, Mail, Clock, MessageCircle } from "lucide-react";
 import { useModules } from "@/contexts/ModulesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -45,7 +45,9 @@ interface MemberRow {
 
 interface InvitationRow {
   id: string;
-  email: string;
+  email: string | null;
+  phone_e164: string | null;
+  channel: "email" | "whatsapp";
   role: TeamRole;
   status: string;
   created_at: string;
@@ -103,7 +105,9 @@ const Team = () => {
       if (error) throw error;
       return (data || []).map((inv) => ({
         id: inv.id,
-        email: inv.email,
+        email: (inv as any).email ?? null,
+        phone_e164: (inv as any).phone_e164 ?? null,
+        channel: ((inv as any).channel ?? "email") as "email" | "whatsapp",
         role: dbToFrontRole[inv.role] || "caller",
         status: inv.status || "pending",
         created_at: inv.created_at || "",
@@ -113,24 +117,30 @@ const Team = () => {
 
   // Invite mutation
   const inviteMutation = useMutation({
-    mutationFn: async (values: { email: string; role: TeamRole }) => {
+    mutationFn: async (values: { channel: "email" | "whatsapp"; contact: string; role: TeamRole }) => {
       const dbRole = frontToDbRole[values.role] as any;
-      // 1. Insert invitation in DB — retrieve the generated token
+
+      if (values.channel === "whatsapp") {
+        const { error: fnError } = await supabase.functions.invoke("whatsapp-send-invitation", {
+          body: { phone: values.contact, role: dbRole, store_id: storeId },
+        });
+        if (fnError) throw fnError;
+        return;
+      }
+
+      // Email channel
       const { data: inv, error } = await supabase
         .from("team_invitations")
-        .insert({ store_id: storeId!, email: values.email, role: dbRole })
+        .insert({ store_id: storeId!, email: values.contact, role: dbRole, channel: "email" })
         .select("token")
         .single();
       if (error) throw error;
-      // 2. Send invitation email via edge function, passing the token so the
-      //    accept-invitation page can create the user_role after auth.
+
       const { error: fnError } = await supabase.functions.invoke("send-invitation", {
-        body: { email: values.email, store_id: storeId, invitation_token: inv?.token },
+        body: { email: values.contact, store_id: storeId, invitation_token: inv?.token },
       });
       if (fnError) {
         console.error("send-invitation error:", fnError);
-        // Invitation is saved in DB; email sending failure is non-blocking
-        // but we show a warning so the admin knows.
         toast({
           title: "Invitation enregistrée",
           description: "L'email n'a pas pu être envoyé automatiquement. Communiquez le lien manuellement si nécessaire.",
@@ -185,7 +195,7 @@ const Team = () => {
       <NewMemberDialog
         open={newMemberOpen}
         onOpenChange={setNewMemberOpen}
-        onSubmit={(values: NewMemberFormValues) => inviteMutation.mutate({ email: values.email, role: values.role })}
+        onSubmit={(values: NewMemberFormValues) => inviteMutation.mutate({ channel: values.channel, contact: values.contact, role: values.role })}
         existingMembers={members}
         existingInvitations={invitations}
         activeModules={activeModules}
@@ -271,7 +281,7 @@ const Team = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
+                    <TableHead>Contact</TableHead>
                     <TableHead>Rôle</TableHead>
                     <TableHead>Envoyée le</TableHead>
                     <TableHead>Actions</TableHead>
@@ -285,8 +295,10 @@ const Team = () => {
                       <TableRow key={inv.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Mail size={14} className="text-muted-foreground" />
-                            <span className="text-sm">{inv.email}</span>
+                            {inv.channel === "whatsapp"
+                              ? <MessageCircle size={14} className="text-green-500" />
+                              : <Mail size={14} className="text-muted-foreground" />}
+                            <span className="text-sm">{inv.email ?? inv.phone_e164 ?? "—"}</span>
                           </div>
                         </TableCell>
                         <TableCell>
