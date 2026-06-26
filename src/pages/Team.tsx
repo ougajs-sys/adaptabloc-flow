@@ -121,10 +121,11 @@ const Team = () => {
       const dbRole = frontToDbRole[values.role] as any;
 
       if (values.channel === "whatsapp") {
-        const { error: fnError } = await supabase.functions.invoke("whatsapp-send-invitation", {
+        const { data, error: fnError } = await supabase.functions.invoke("whatsapp-send-invitation", {
           body: { phone: values.contact, role: dbRole, store_id: storeId },
         });
         if (fnError) throw fnError;
+        if ((data as any)?.success === false) throw new Error((data as any).error || "Échec de l'envoi");
         return;
       }
 
