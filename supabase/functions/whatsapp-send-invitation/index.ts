@@ -146,8 +146,14 @@ Deno.serve(async (req) => {
       // Rollback the invitation if sending fails
       await adminClient.from("team_invitations").delete().eq("token", inv.token);
       console.error("Meta API error:", metaJson);
-      return new Response(JSON.stringify({ error: "Échec de l'envoi WhatsApp.", details: metaJson }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Return 200 with success:false so the client can read the detailed error
+      const metaErr = metaJson?.error?.message || metaJson?.error?.error_user_msg || "Échec de l'envoi WhatsApp";
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Échec WhatsApp : ${metaErr}`,
+        meta_error: metaJson?.error,
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
